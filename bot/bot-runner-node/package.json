@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "mineflayer": "^4.37.1",
-    "mineflayer-pathfinder": "2.4.5"
+    "mineflayer-pathfinder": "2.4.5",
+    "prismarine-auth": "^3.1.1"
   },
   "bin": {
     "vitaminmcp-bot-runner": "runner.mjs"

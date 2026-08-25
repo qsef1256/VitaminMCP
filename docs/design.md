@@ -98,9 +98,11 @@ This path is introduced when it becomes necessary. It is out of the initial scop
 
 ### 3.3 Real accounts — final smoke only
 
-Mineflayer's authenticated account path is outside the initial scope because account cost and
-automation-flag risk rule out running many real accounts. One or two real-account checks are a
-final staging smoke test only.
+Mineflayer uses Microsoft device-code authentication for `online-mode=true` smoke tests. The first
+spawn returns the URL and code while authentication continues in the runner; retrying the spawn
+after sign-in reuses the private local token cache. The tool never accepts a password or access
+token. Account cost and automation-flag risk still make this a dedicated-account, final-staging
+path rather than the default for a large test matrix.
 
 ---
 

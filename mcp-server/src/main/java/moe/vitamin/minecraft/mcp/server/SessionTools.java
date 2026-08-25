@@ -93,7 +93,8 @@ final class SessionTools {
 
         tools.add(tool("bot_spawn",
                 "Connect a bot and wait until it is standing in the world with the ground "
-                        + "beneath it loaded. Its UUID is derived from its name, so the same name "
+                        + "beneath it loaded. Rejected while the connected agent is read-only. "
+                        + "Offline auth is the default and derives the UUID from the name, so the same name "
                         + "is the same player every run and permission-dependent behaviour is "
                         + "reproducible — which also means THE SERVER REMEMBERS THEM. Inventory, "
                         + "position, advancements and anything a plugin stored against that UUID "
@@ -113,6 +114,14 @@ final class SessionTools {
                             "Optional spoofed address for the BungeeCord forwarding handshake. "
                                     + "Omit for a normal login; pass it only when the server has "
                                     + "bungeecord=true and the test needs an attributed IP.");
+                    string(properties, "auth",
+                            "offline (default) or microsoft. Microsoft authentication works with "
+                                    + "online-mode=true. The first call returns a device login URL "
+                                    + "and code; complete it and call bot_spawn again.");
+                    string(properties, "account",
+                            "Local cache key for a Microsoft account, defaulting to name. It may "
+                                    + "be an email or a harmless alias and is never sent to the "
+                                    + "Minecraft server. Reuse it to reuse the cached login.");
                 }));
 
         tools.add(tool("bot_inspect",
@@ -169,7 +178,8 @@ final class SessionTools {
                 }));
 
         tools.add(tool("bot_run_scenario",
-                "Run a declarative scenario. Steps: spawn, despawn, move_to, break_block, "
+                "Run a declarative scenario. Rejected while the connected agent is read-only. "
+                        + "Steps: spawn, despawn, move_to, break_block, "
                         + "attack_entity, use_block, use_entity, hold_item, drop_item, "
                         + "place_block, jump, sneak, sprint, look_at, assert_reachable, "
                         + "command, chat, console, click_slot, "
@@ -262,6 +272,7 @@ final class SessionTools {
         sessions.put(name, started);
 
         JsonNode info = started.agent().call("server_info", AgentClient.arguments());
+        started.readOnly(info.path("readOnly").asBoolean(true));
 
         ObjectNode result = MAPPER.createObjectNode();
         result.put("session", name);
@@ -335,16 +346,20 @@ final class SessionTools {
             throw new IllegalArgumentException("bot_spawn needs 'name'.");
         }
         Session session = require(args);
+        requireWritable(session.readOnly());
         refuseIfAlreadyOnline(session, name);
 
         try {
             BotRunner.BotHandle bot = session.bots().spawn(
-                    name, args.hasNonNull("clientIp") ? args.get("clientIp").asText() : null);
+                    name,
+                    args.hasNonNull("clientIp") ? args.get("clientIp").asText() : null,
+                    args.path("auth").asText("offline"),
+                    args.path("account").asText(null));
 
             ObjectNode result = MAPPER.createObjectNode();
             result.put("name", name);
-            result.put("uuid",
-                    moe.vitamin.minecraft.mcp.bot.core.BotIdentity.offlineUuid(name).toString());
+            result.put("playerName", bot.playerName());
+            result.put("uuid", bot.uuid());
             result.put("x", bot.blockX());
             result.put("y", bot.blockY());
             result.put("z", bot.blockZ());
@@ -356,7 +371,7 @@ final class SessionTools {
             try {
                 ObjectNode query = AgentClient.arguments();
                 query.put("kind", "player");
-                query.put("target", name);
+                query.put("target", bot.playerName());
                 JsonNode state = session.agent().call("state_query", query);
                 result.put("gameMode", state.path("gameMode").asText(null));
                 result.put("op", state.path("op").asBoolean(false));
@@ -580,7 +595,9 @@ final class SessionTools {
             throw new IllegalArgumentException("bot_run_scenario needs 'scenario'.");
         }
 
-        ScenarioResult result = require(args).runner().run(scenario);
+        Session session = require(args);
+        requireWritable(session.readOnly());
+        ScenarioResult result = session.runner().run(scenario);
 
         ObjectNode response = MAPPER.createObjectNode();
         response.put("passed", result.passed());
@@ -599,6 +616,16 @@ final class SessionTools {
             }
         }
         return response;
+    }
+
+    /** The documented read-only boundary also covers player joins and bot actions. */
+    static void requireWritable(boolean readOnly) {
+        if (readOnly) {
+            throw new IllegalStateException(
+                    "Bot actions are unavailable: this agent is running read-only. Set "
+                            + "'read-only: false' in config.yml and restart the server to allow "
+                            + "players or scenarios to change it.");
+        }
     }
 
     /** Where a session is connecting, and how that was worked out. */

@@ -47,6 +47,27 @@ class SessionToolsTest {
     }
 
     @Test
+    void botSpawnPublishesMicrosoftAuthenticationWithoutMakingItTheDefault() {
+        JsonNode spawn = findTool(new SessionTools().listTools(), "bot_spawn");
+
+        JsonNode properties = spawn.path("inputSchema").path("properties");
+        assertTrue(properties.path("auth").path("description").asText()
+                .contains("online-mode=true"));
+        assertTrue(properties.path("account").path("description").asText()
+                .contains("cache key"));
+        assertTrue(spawn.path("description").asText().contains("read-only"));
+    }
+
+    @Test
+    void readOnlyModeRejectsBotMutationAtTheOuterServer() {
+        IllegalStateException rejected = assertThrows(
+                IllegalStateException.class, () -> SessionTools.requireWritable(true));
+
+        assertTrue(rejected.getMessage().contains("read-only"));
+        SessionTools.requireWritable(false);
+    }
+
+    @Test
     void aMessageCursorRejectsASameNamedBotWithAnotherStreamId() {
         ClientView first = view(43L, "opaque-stream-a", List.of(
                 new ClientMessage(42L, 1_000L, "first connection")));

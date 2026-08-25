@@ -87,9 +87,13 @@ public final class ScenarioRunner {
                 try {
 
                     BotRunner.BotHandle bot = bots.spawn(
-                            name, step.hasNonNull("clientIp") ? step.get("clientIp").asText() : null);
+                            name,
+                            step.hasNonNull("clientIp") ? step.get("clientIp").asText() : null,
+                            step.path("auth").asText("offline"),
+                            step.path("account").asText(null));
                     yield ScenarioResult.StepResult.ok(index, action,
-                            name + " joined at " + bot.x() + ", " + bot.y() + ", " + bot.z());
+                            bot.playerName() + " joined at " + bot.x() + ", " + bot.y()
+                                    + ", " + bot.z());
                 } catch (java.io.IOException e) {
 
                     throw new IllegalStateException(

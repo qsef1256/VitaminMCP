@@ -12,6 +12,9 @@ final class Session {
     private final AgentClient agent;
     private final java.nio.file.Path runnerJar;
 
+    /** Defaults closed until session_start has read the agent's declared mode. */
+    private boolean readOnly = true;
+
     /** Replaced by {@link #reset()}, which restarts the process rather than reusing it. */
     private BotRunner bots;
 
@@ -31,6 +34,14 @@ final class Session {
 
     BotRunner bots() {
         return bots;
+    }
+
+    boolean readOnly() {
+        return readOnly;
+    }
+
+    void readOnly(boolean readOnly) {
+        this.readOnly = readOnly;
     }
 
     /** Whether the child runner still exists. */

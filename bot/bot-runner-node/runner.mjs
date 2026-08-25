@@ -16,6 +16,10 @@ import { Dispatch } from './src/dispatch.mjs';
 import * as protocol from './src/protocol.mjs';
 import { pingProtocol, versionForProtocol } from './src/version.mjs';
 
+// stdout belongs exclusively to the runner protocol. Authentication dependencies use console.info.
+console.log = console.error;
+console.info = console.error;
+
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.length < 2) {

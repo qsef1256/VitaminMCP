@@ -104,22 +104,23 @@ final class SetupPrompts {
         if (bots) {
             text.append("""
 
-                    4. Bots need three settings, so ask me first whether this server should \
-                    accept them. They are a test-harness configuration and must never be applied \
-                    to a server reachable from the internet, because anyone who can open a socket \
-                    to it can then impersonate anyone:
+                    4. Bots change server state, so ask before setting read-only: false in \
+                    plugins/VitaminMCP/config.yml, and restart after changing it. Skip this for a \
+                    server that only needs inspecting — events, logs, exceptions and live state \
+                    all work without bots.
 
-                       - server.properties: online-mode=false
+                    5. Ask which bot identity the test needs. Prefer Microsoft device-code auth \
+                    for a server that must keep online-mode=true; its first bot_spawn returns a \
+                    URL and code, and the same call is retried after browser sign-in. The default \
+                    offline bot requires online-mode=false and must never be enabled on a server \
+                    reachable from the internet, because anyone who can open a socket can then \
+                    impersonate anyone.
 
-                    Say plainly what each one does before I decide, and restart the server after \
-                    changing them. Skip this step for a server that only needs inspecting — \
-                    events, logs, exceptions and live state all work without bots.
-
-                    5. Call session_start with no arguments. On this machine it finds the host, \
+                    6. Call session_start with no arguments. On this machine it finds the host, \
                     both ports and the token by itself. Then report the server version, the TPS \
                     and the plugins it found.
 
-                    6. If bots were enabled, spawn one bot to prove the path end to end, then \
+                    7. Spawn one bot with the chosen auth mode to prove the path end to end, then \
                     disconnect it with session_reset.
                     """);
         } else {

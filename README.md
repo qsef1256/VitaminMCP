@@ -97,7 +97,7 @@ proxied from the plugin, so which ones exist is decided by the server you connec
 
 | | |
 |---|---|
-| `bot_spawn` | Connect a bot and wait until it is standing in the world. UUID derives from the name |
+| `bot_spawn` | Connect an offline bot or a Microsoft-authenticated account and wait until it is standing in the world |
 | `bot_inspect` | What the bot's client was actually sent: menu contents, messages (chat, action bar, title, subtitle) with the millisecond each arrived and a cursor to read only what came after an action, boss bars, sidebar scoreboard, health, food, experience and active effects |
 | `bot_view` | Open a localhost-only live world or inventory view for a bot. The inventory view needs nothing extra; the world view downloads an optional asset the first time it is asked for, published for Windows x64 |
 | `bot_run_scenario` | Run a whole scenario. Stops at the first failure with evidence attached |
@@ -350,7 +350,28 @@ is. Three defaults to know before you change anything:
 
 Skip this section if you only need the agent.
 
-Bots use offline mode and reuse the same deterministic UUID when the bot name is reused:
+Bot joins and actions change server state, so set `read-only: false` in
+`plugins/VitaminMCP/config.yml` and restart before using them.
+
+#### Microsoft account — keep `online-mode=true`
+
+Use a dedicated test account whose Minecraft profile name is `Tester1`:
+
+```json
+bot_spawn {"name":"Tester1", "auth":"microsoft", "account":"qa-primary"}
+```
+
+The first call returns a Microsoft device-login URL and code. Complete that login in a browser,
+then make the same call again. `account` is only a local cache key — it may be an email or a harmless
+alias — and is never sent to the Minecraft server. Tokens are kept under
+`~/.vitaminmcp/accounts`; set `VITAMINMCP_ACCOUNTS_DIR` before the MCP server starts to move that
+private cache. The authenticated profile name must match `name`, so scenario steps and server-side
+queries address the same player.
+
+#### Offline bot — isolated harness only
+
+Offline is the default when `auth` is omitted. It reuses the same deterministic UUID when the bot
+name is reused and requires:
 
 ```properties
 # server.properties
@@ -360,7 +381,8 @@ online-mode=false
 > not a production one. No BungeeCord setting is required for normal Node logins.
 
 Reusing a bot name reuses its deterministic offline UUID. Set BungeeCord forwarding explicitly only
-for a test that passes `clientIp` and needs a spoofed address or UUID.
+for a test that passes `clientIp` and needs a spoofed address or UUID. `clientIp` is incompatible
+with Microsoft authentication.
 
 `move_to` walks to its destination by default, using the same client-side physics loop that sends
 the movement packets between the two points. That means plugins listening for pressure plates and

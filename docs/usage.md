@@ -390,13 +390,28 @@ each hold a bot runner process, so close the ones you are done with.
 bot_spawn {"name": "Tester1"}
 ```
 
-The name is the identity. The UUID derives from it, so `Tester1` is the same player today as
-yesterday and permission-dependent behaviour reproduces. The response is the UUID and where it
-landed.
+Offline authentication is the default. The name is the identity and the UUID derives from it, so
+`Tester1` is the same player today as yesterday and permission-dependent behaviour reproduces. The
+response is the handle name, actual player name, UUID and where it landed.
 
 Omit `clientIp` for an ordinary login. If the test needs the server to attribute the connection to
 a chosen address — IP bans, per-IP connection limits or geo logic — pass `clientIp` and set the test
 server's `spigot.yml` `settings.bungeecord` to `true`; that opts into the forwarding handshake.
+
+For an `online-mode=true` server, authenticate a dedicated Microsoft account instead:
+
+```json
+bot_spawn {"name":"RealProfileName", "auth":"microsoft", "account":"qa-primary"}
+```
+
+On the first call, open the returned device-login URL and enter its code. Authentication continues
+in the runner; after completing it, repeat the same `bot_spawn` call. `account` is a local token
+cache key and defaults to `name`. Cached tokens live under `~/.vitaminmcp/accounts`, or the
+directory named by `VITAMINMCP_ACCOUNTS_DIR` when the MCP server started. No password or access
+token belongs in a tool call. `clientIp` forwarding is available only to offline bots.
+
+Both bot modes are rejected while the agent is `read-only: true`; enable writes and restart the
+server before spawning or running a scenario.
 
 After that, use the proxied agent tools directly. `wait_for`, `state_query` and `events_query` all
 go to the session's server — the only one open, or the one `session` names.
@@ -687,6 +702,9 @@ When the cause is not visible there, dig in this order:
 | Symptom | Cause |
 |---|---|
 | Bot connection refused with `did you forget to enable BungeeCord in spigot.yml?` | The server is not `online-mode=false` + `bungeecord: true` ([README](../README.md) §2) |
+| `Microsoft login required` | Open the URL, enter the device code, finish login, then repeat the same `bot_spawn` call |
+| Microsoft login owns a different profile | `name` must be the authenticated Minecraft Java profile name; keep `account` as the cache alias |
+| Bot actions are unavailable in read-only mode | Set `read-only: false` in the agent config and restart; bot joins and actions change server state |
 | `err startup ... unsupported server version` | The Node runner has no minecraft-data entry for what this server speaks. Add the version to the compatibility matrix only after a live verification. |
 | Events are not captured | The type is on the high-frequency list. Name it in `types`, and enable `capture-high-frequency` if needed |
 | `command_exec` is missing | `read-only: true` (the default). `session_start`'s `agentTools` lists the tools that actually exist |

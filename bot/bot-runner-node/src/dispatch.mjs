@@ -30,7 +30,7 @@ export class Dispatch {
     try {
       return await this.#run(verb, command);
     } catch (error) {
-      return protocol.encode(protocol.ERROR, verb, String(error?.message ?? error));
+      return protocol.encode(protocol.ERROR, verb, protocol.sanitize(error?.message ?? error));
     }
   }
 
@@ -38,7 +38,9 @@ export class Dispatch {
     switch (verb) {
       case protocol.SPAWN: {
         const clientIp = command.length > 2 ? command[2] : '';
-        return positionLine(verb, await this.#bots.spawn(command[1], clientIp));
+        const auth = command.length > 3 ? command[3] : 'offline';
+        const account = command.length > 4 ? command[4] : '';
+        return spawnLine(verb, await this.#bots.spawn(command[1], clientIp, auth, account));
       }
 
       case protocol.DESPAWN: {
@@ -299,5 +301,17 @@ function positionLine(verb, at) {
     protocol.javaDouble(at.x),
     protocol.javaDouble(at.y),
     protocol.javaDouble(at.z),
+  );
+}
+
+function spawnLine(verb, at) {
+  return protocol.encode(
+    protocol.OK,
+    verb,
+    protocol.javaDouble(at.x),
+    protocol.javaDouble(at.y),
+    protocol.javaDouble(at.z),
+    protocol.sanitize(at.playerName),
+    protocol.sanitize(at.uuid),
   );
 }

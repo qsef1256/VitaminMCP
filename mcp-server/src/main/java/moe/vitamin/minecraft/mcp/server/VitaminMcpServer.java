@@ -8,12 +8,15 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
 /** The MCP server a client such as Claude Code launches. */
 public final class VitaminMcpServer {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String PROTOCOL_VERSION = "2025-06-18";
+    private static final Set<String> SUPPORTED_PROTOCOL_VERSIONS =
+            Set.of("2025-06-18", "2025-03-26", "2024-11-05");
 
     /** This build, from the jar manifest, or "dev" when running from classes rather than a jar. */
     private static final String VERSION = version();
@@ -95,7 +98,8 @@ public final class VitaminMcpServer {
 
     private ObjectNode initialize(JsonNode params) {
         ObjectNode result = MAPPER.createObjectNode();
-        result.put("protocolVersion", params.path("protocolVersion").asText(PROTOCOL_VERSION));
+        result.put("protocolVersion", negotiateProtocolVersion(
+                params.path("protocolVersion").asText(PROTOCOL_VERSION)));
         ObjectNode capabilities = result.putObject("capabilities");
         capabilities.putObject("tools");
         capabilities.putObject("prompts");
@@ -116,6 +120,10 @@ public final class VitaminMcpServer {
                         + "the server has not got the plugin yet: the 'setup' prompt installs "
                         + "it.");
         return result;
+    }
+
+    static String negotiateProtocolVersion(String requested) {
+        return SUPPORTED_PROTOCOL_VERSIONS.contains(requested) ? requested : PROTOCOL_VERSION;
     }
 
     /** Runs a tool. */

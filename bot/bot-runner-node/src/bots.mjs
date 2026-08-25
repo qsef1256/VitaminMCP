@@ -1,10 +1,20 @@
 import mineflayer from 'mineflayer';
+import { mkdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
+import prismarineAuth from 'prismarine-auth';
 import { configurePathfinder, loadPathfinder, moveTo } from './movement.mjs';
 import { reachable } from './movement.mjs';
 import { stopAllViews, stopView as stopBotView, view as startView } from './viewer.mjs';
 
 import { collect, forget } from './clientview.mjs';
 import { addressField, identity } from './identity.mjs';
+
+const { Authflow } = prismarineAuth;
+
+const DEFAULT_ACCOUNTS_DIRECTORY = resolve(
+  process.env.VITAMINMCP_ACCOUNTS_DIR ?? join(homedir(), '.vitaminmcp', 'accounts'),
+);
 
 /** How long a bot has to get from a socket to standing in the world. */
 const LOGIN_TIMEOUT_MILLIS = 30_000;
@@ -27,16 +37,19 @@ export class BotRegistry {
 
   #version;
 
+  #accounts;
+
   #bots = new Map();
 
-  constructor(host, port, version) {
+  constructor(host, port, version, accounts = new MicrosoftAccounts()) {
     this.#host = host;
     this.#port = port;
     this.#version = version;
+    this.#accounts = accounts;
   }
 
   /** Connects a bot and waits until it is standing in the world. */
-  async spawn(name, clientIp) {
+  async spawn(name, clientIp, auth = 'offline', account = '') {
     // The Java runner overwrites the map entry, so a repeated spawn is not an error there and must
     // not become one here. Closing the old socket first is the only difference: leaving it open
     // would hold a player slot under a name this runner no longer tracks.
@@ -46,12 +59,40 @@ export class BotRegistry {
       quietly(() => existing.quit());
     }
 
-    const id = identity(name);
-    // Normal logins use the server's ordinary offline UUID for this name, which stays stable when
-    // a test reuses the same bot. A clientIp is an explicit request for the opt-in BungeeCord
-    // forwarding handshake used by tests that need a spoofed address or UUID.
+    const mode = authenticationMode(auth);
+    if (mode === 'microsoft' && clientIp?.trim()) {
+      throw new Error('clientIp forwarding is only available for offline bots');
+    }
+
+    const accountKey = account?.trim() || name;
+    const authenticated = mode === 'microsoft'
+      ? await this.#accounts.require(accountKey)
+      : null;
+    if (authenticated && authenticated.profile.name.toLowerCase() !== name.toLowerCase()) {
+      throw new Error(
+        `Microsoft account '${accountKey}' owns profile '${authenticated.profile.name}', `
+          + `not '${name}'. Call bot_spawn with name='${authenticated.profile.name}'.`,
+      );
+    }
+
+    const id = authenticated
+      ? identity(authenticated.profile.name, { uuid: canonicalUuid(authenticated.profile.id) })
+      : identity(name);
     const bot = mineflayer.createBot(
-      connectionOptions(this.#host, this.#port, this.#version, id, clientIp),
+      connectionOptions(
+        this.#host,
+        this.#port,
+        this.#version,
+        id,
+        clientIp,
+        mode,
+        accountKey,
+        authenticated?.profilesFolder,
+        (code) => {
+          this.#accounts.invalidate(accountKey);
+          throw new Error(loginRequired(accountKey, code));
+        },
+      ),
     );
     loadPathfinder(bot);
 
@@ -77,7 +118,11 @@ export class BotRegistry {
     configurePathfinder(bot);
     await settle(bot, name);
     await worldKnown(bot, name);
-    return position(bot);
+    return {
+      ...position(bot),
+      playerName: id.name,
+      uuid: id.uuid,
+    };
   }
 
   async move(name, x, y, z, mode, timeoutMillis) {
@@ -137,20 +182,147 @@ export class BotRegistry {
   }
 }
 
-/** Builds a normal login, adding BungeeCord forwarding only for an explicit clientIp test. */
-export function connectionOptions(host, port, version, id, clientIp) {
+/** Builds a login, adding BungeeCord forwarding only for an explicit offline-mode IP test. */
+export function connectionOptions(
+  host,
+  port,
+  version,
+  id,
+  clientIp,
+  auth = 'offline',
+  account = id.name,
+  profilesFolder = DEFAULT_ACCOUNTS_DIRECTORY,
+  onMsaCode = undefined,
+) {
+  const mode = authenticationMode(auth);
   const options = {
     host,
     port,
-    username: id.name,
-    auth: 'offline',
+    username: mode === 'microsoft' ? account : id.name,
+    auth: mode,
     version,
     checkTimeoutInterval: LOGIN_TIMEOUT_MILLIS,
   };
-  if (clientIp && clientIp.trim()) {
+  if (mode === 'microsoft') {
+    options.profilesFolder = profilesFolder;
+    options.onMsaCode = onMsaCode;
+  } else if (clientIp && clientIp.trim()) {
     options.fakeHost = addressField(host, clientIp.trim(), id);
   }
   return options;
+}
+
+/** Microsoft device-code authentication that survives a failed first spawn through its cache. */
+export class MicrosoftAccounts {
+  #directory;
+
+  #createFlow;
+
+  #states = new Map();
+
+  constructor(
+    directory = DEFAULT_ACCOUNTS_DIRECTORY,
+    createFlow = (account, profilesFolder, onCode) => new Authflow(
+      account,
+      profilesFolder,
+      undefined,
+      onCode,
+    ),
+  ) {
+    this.#directory = resolve(directory);
+    this.#createFlow = createFlow;
+  }
+
+  async require(account) {
+    let state = this.#states.get(account);
+    if (!state) {
+      state = this.#start(account);
+      this.#states.set(account, state);
+    }
+    if (state.status === 'starting') {
+      await state.firstUpdate;
+    }
+    if (state.status === 'ready') {
+      return { profile: state.profile, profilesFolder: this.#directory };
+    }
+    if (state.status === 'failed') {
+      this.#states.delete(account);
+      throw state.error;
+    }
+    throw new Error(loginRequired(account, state.code));
+  }
+
+  invalidate(account) {
+    this.#states.delete(account);
+  }
+
+  #start(account) {
+    let announce;
+    const state = {
+      status: 'starting',
+      code: null,
+      profile: null,
+      error: null,
+      firstUpdate: new Promise((resolveFirstUpdate) => {
+        announce = resolveFirstUpdate;
+      }),
+    };
+
+    const authenticate = async () => {
+      await mkdir(this.#directory, { recursive: true, mode: 0o700 });
+      const flow = this.#createFlow(account, this.#directory, (code) => {
+        state.status = 'pending';
+        state.code = code;
+        announce();
+      });
+      const result = await flow.getMinecraftJavaToken({
+        fetchProfile: true,
+        fetchCertificates: false,
+      });
+      if (!result.profile?.name || !result.profile?.id) {
+        throw new Error(`Microsoft account '${account}' has no Minecraft Java profile`);
+      }
+      state.status = 'ready';
+      state.profile = result.profile;
+      announce();
+    };
+
+    authenticate().catch((error) => {
+      state.status = 'failed';
+      state.error = error instanceof Error ? error : new Error(String(error));
+      announce();
+    });
+    return state;
+  }
+}
+
+function authenticationMode(auth) {
+  const mode = String(auth || 'offline').toLowerCase();
+  if (mode !== 'offline' && mode !== 'microsoft') {
+    throw new Error(`unknown bot auth '${auth}'; use offline or microsoft`);
+  }
+  return mode;
+}
+
+function loginRequired(account, code) {
+  const uri = code?.verification_uri || 'https://www.microsoft.com/link';
+  const userCode = code?.user_code || '(request a new code)';
+  return `Microsoft login required for account '${account}'. Open ${uri} and enter code `
+    + `${userCode}, complete sign-in, then call bot_spawn again with the same name and account.`;
+}
+
+function canonicalUuid(value) {
+  const compact = String(value).replaceAll('-', '');
+  if (!/^[0-9a-fA-F]{32}$/.test(compact)) {
+    throw new Error(`Microsoft returned an invalid Minecraft profile UUID: ${value}`);
+  }
+  return [
+    compact.slice(0, 8),
+    compact.slice(8, 12),
+    compact.slice(12, 16),
+    compact.slice(16, 20),
+    compact.slice(20),
+  ].join('-').toLowerCase();
 }
 
 function position(bot) {

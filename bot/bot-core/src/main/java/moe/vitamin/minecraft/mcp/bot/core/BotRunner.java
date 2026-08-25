@@ -174,11 +174,27 @@ public final class BotRunner implements AutoCloseable {
 
     /** Connects a bot that claims to be connecting from a particular address. */
     public BotHandle spawn(String name, String clientIp) throws IOException {
-        String[] reply = send(RunnerProtocol.SPAWN, name, clientIp == null ? "" : clientIp);
+        return spawn(name, clientIp, "offline", null);
+    }
+
+    /** Connects an offline bot or a Microsoft-authenticated Minecraft account. */
+    public BotHandle spawn(String name, String clientIp, String auth, String account)
+            throws IOException {
+        String[] reply = send(RunnerProtocol.SPAWN, name, clientIp == null ? "" : clientIp,
+                auth == null ? "offline" : auth, account == null ? "" : account);
+        String playerName = reply.length > 5 && !reply[5].isBlank() ? reply[5] : name;
+        String uuid = reply.length > 6 && !reply[6].isBlank()
+                ? reply[6]
+                : BotIdentity.offlineUuid(name).toString();
+        if ("microsoft".equalsIgnoreCase(auth) && reply.length <= 6) {
+            throw new IOException(
+                    "This bot runner predates Microsoft authentication; use the runner that "
+                            + "ships with this MCP server version.");
+        }
         live.add(name);
         return new BotHandle(this, name,
                 Double.parseDouble(reply[2]), Double.parseDouble(reply[3]),
-                Double.parseDouble(reply[4]));
+                Double.parseDouble(reply[4]), playerName, uuid);
     }
 
     public void despawn(String name) throws IOException {
@@ -266,7 +282,13 @@ public final class BotRunner implements AutoCloseable {
     }
 
     /** One bot, addressed by name through its runner. */
-    public record BotHandle(BotRunner runner, String name, double x, double y, double z) {
+    public record BotHandle(
+            BotRunner runner, String name, double x, double y, double z,
+            String playerName, String uuid) {
+
+        public BotHandle(BotRunner runner, String name, double x, double y, double z) {
+            this(runner, name, x, y, z, name, BotIdentity.offlineUuid(name).toString());
+        }
 
         public int blockX() {
             return (int) Math.floor(x);
