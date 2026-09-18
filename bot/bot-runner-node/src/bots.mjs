@@ -17,12 +17,6 @@ const DEFAULT_ACCOUNTS_DIRECTORY = resolve(
   process.env.VITAMINMCP_ACCOUNTS_DIR ?? join(homedir(), '.vitaminmcp', 'accounts'),
 );
 
-const { Authflow } = prismarineAuth;
-
-const DEFAULT_ACCOUNTS_DIRECTORY = resolve(
-  process.env.VITAMINMCP_ACCOUNTS_DIR ?? join(homedir(), '.vitaminmcp', 'accounts'),
-);
-
 /** How long a bot has to get from a socket to standing in the world. */
 const LOGIN_TIMEOUT_MILLIS = 30_000;
 

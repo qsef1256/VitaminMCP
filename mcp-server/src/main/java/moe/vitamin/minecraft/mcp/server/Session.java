@@ -16,9 +16,6 @@ final class Session {
     /** Defaults closed until session_start has read the agent's declared mode. */
     private boolean readOnly = true;
 
-    /** Defaults closed until session_start has read the agent's declared mode. */
-    private boolean readOnly = true;
-
     /** Replaced by {@link #reset()}, which restarts the process rather than reusing it. */
     private BotRunner bots;
 
