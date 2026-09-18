@@ -1,13 +1,13 @@
 {
   "name": "vitaminmcp",
   "description": "Test Minecraft plugins end to end: drive a real Paper server and real protocol bots.",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "author": {
     "name": "Backas03",
     "url": "https://github.com/Backas03"
   },
-  "homepage": "https://github.com/Backas03/VitaminMCP-minecraft#readme",
-  "repository": "https://github.com/Backas03/VitaminMCP-minecraft",
+  "homepage": "https://github.com/Backas03/VitaminMCP#readme",
+  "repository": "https://github.com/Backas03/VitaminMCP",
   "license": "MIT",
   "keywords": [
     "minecraft",

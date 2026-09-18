@@ -30,7 +30,7 @@ const ASSETS = [
   'bot-runner-darwin-arm64',
   'bot-runner-viewer-win-x64.tgz',
 ];
-const API = 'https://api.github.com/repos/Backas03/VitaminMCP-minecraft/releases/tags';
+const API = 'https://api.github.com/repos/Backas03/VitaminMCP/releases/tags';
 
 /** The version this project is on, read from the single place that declares it. */
 async function projectVersion() {

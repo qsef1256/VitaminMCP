@@ -18,7 +18,7 @@ final class SetupPrompts {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final String RELEASES =
-            "https://github.com/Backas03/VitaminMCP-minecraft/releases";
+            "https://github.com/Backas03/VitaminMCP/releases";
 
     private final String version;
 

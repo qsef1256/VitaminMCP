@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-const RELEASES = 'https://github.com/Backas03/VitaminMCP-minecraft/releases/download';
+const RELEASES = 'https://github.com/Backas03/VitaminMCP/releases/download';
 
 /** The jar this package launches, and the one it launches in turn. */
 export const MCP_SERVER_JAR = 'mcp-server.jar';
@@ -20,7 +20,7 @@ export const VIEWER_ASSET = 'bot-runner-viewer-win-x64.tgz';
 let checksumsPromise;
 let manifestPromise;
 
-const REPORT = 'https://github.com/Backas03/VitaminMCP-minecraft/issues';
+const REPORT = 'https://github.com/Backas03/VitaminMCP/issues';
 
 /**
  * The exact bytes this version of the package expects, stamped in at release.

@@ -1,6 +1,6 @@
 {
   "name": "vitaminmcp",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "mcpName": "io.github.Backas03/vitaminmcp",
   "description": "MCP server for testing Minecraft plugins: drives a real Paper server and real protocol bots from an AI agent.",
   "keywords": [
@@ -13,11 +13,11 @@
     "plugin-testing",
     "end-to-end-testing"
   ],
-  "homepage": "https://github.com/Backas03/VitaminMCP-minecraft#readme",
-  "bugs": "https://github.com/Backas03/VitaminMCP-minecraft/issues",
+  "homepage": "https://github.com/Backas03/VitaminMCP#readme",
+  "bugs": "https://github.com/Backas03/VitaminMCP/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Backas03/VitaminMCP-minecraft.git",
+    "url": "git+https://github.com/Backas03/VitaminMCP.git",
     "directory": "npm"
   },
   "license": "MIT",

@@ -14,7 +14,8 @@ nothing about whether the server boots**, and a plugin that boots can still refu
 1. `session_start` — every other tool depends on it
 2. **Observe before acting**: `logs_query`, `exceptions_recent`, `events_summary`, `state_query`
 3. Spawn bots and drive them only once you know the server's current state
-4. Wait with `wait_for`, never by sleeping
+4. Once the steps are known, hand the whole sequence to `bot_run_scenario`
+5. Wait with `wait_for`, never by sleeping
 
 ## 1. Connecting
 
@@ -27,6 +28,10 @@ Pass only what differs:
 - `mcpPort` — which agent, when several run on this machine. A proxied network is several servers,
   one agent each, and with more than one running an omitted `mcpPort` is an error that lists them
   rather than a guess
+- `session` — a name for this connection. **Several sessions can be open at once**, which is what a
+  proxied network needs: one per backend, each with its own agent. Opening one never disturbs the
+  others, so bots stay connected. Name them (`lobby`, `survival`) and pass `session` to every later
+  call — it is optional only while exactly one is open
 - `port` — the Minecraft port bots connect to, which on a proxied network is the proxy's
 - `host` and `token` — **required together for a server on another machine.** A token minted
   locally says nothing about a remote server and is deliberately not sent there. The token is the
@@ -38,10 +43,12 @@ Pass only what differs:
 **If nothing answers, the server has not got the plugin.** The `setup` prompt — in Claude Code,
 `/mcp__vitaminmcp__setup` — installs it.
 
-Call `server_info` right after connecting. A wrong host, port or token surfaces here instead of
-inside some unrelated tool three steps later. The response also carries `agentTools`, the real
-parameters of the proxied tools, which depend on the agent: a read-only install exposes no
-`command_exec` at all.
+**`session_start`'s own response carries `agentTools`** — the real parameters of the proxied tools,
+which depend on the agent. Read it: a read-only install (`read-only: true` is the default) exposes
+no `command_exec` at all, so the tool is there but every call is refused.
+
+Then call `server_info`. A wrong host, port or token surfaces here instead of inside some unrelated
+tool three steps later.
 
 ### A session does not outlive the conversation reliably
 
@@ -67,9 +74,9 @@ plain HTTP. The user has to start the tunnel, so write the command out and wait.
 ### After a restart, two different things have to come up
 
 The agent port and the Minecraft port open at different times. An agent that answers (HTTP 401
-means alive) does not mean the world has finished loading, and `session_start` will fail in the bot
-runner with `SocketTimeoutException: Read timed out`. Wait for the agent first, then for the
-Minecraft port to accept a server-list ping.
+means alive) does not mean the world has finished loading, and a bot spawned into that gap fails in
+the runner with a connection timeout rather than anything that names the real cause. Wait for the
+agent first, then for the Minecraft port to accept a server-list ping.
 
 ## 2. Observing
 
@@ -153,6 +160,15 @@ exist as a server-side inventory, so nothing else can show it.
 name**, so the same name is the same player every run and permission-dependent behaviour is
 reproducible.
 
+### The same name means the server remembers them
+
+That reproducibility cuts both ways: inventory, position, advancements and anything a plugin stored
+against that UUID **survive from earlier runs.** A bot you have used before is not a fresh player,
+so "it has the item" may be left over rather than just granted, and a first-join path will not fire.
+
+Use an unused name when a first join is what is being tested, and clear what you left behind with
+`clear <name>` through `command_exec`.
+
 ### The first ~2 seconds after joining are locked out
 
 The server is loading the player's data, and everything is refused in that window. A bot that
@@ -173,16 +189,50 @@ nothing" look identical. Look here before forming a theory.
 Live state a server shows a player — timers, balances, region names, quest progress — is usually
 drawn in the scoreboard or a boss bar and visible nowhere else.
 
+**To isolate one action's reply, use the cursor.** Call `bot_inspect` first, keep `messageCursor`,
+run the command, then pass it back as `cursor` — otherwise you are reading the whole backlog and
+guessing which line answered you. Only 100 messages are retained per bot; a nonzero `messagesDropped`
+means the answer you want has already fallen out of the window.
+
+`bot_view` opens a live localhost page for one bot — `what="world"` for the world, `what="inventory"`
+for the open menu. It is for showing a human what is happening; it answers nothing that
+`state_query` and `bot_inspect` do not.
+
 ### Permissions
 
 If the plugin's source is available, read which node the action needs and grant that. If it is not,
 granting op, testing, and taking op away again is an acceptable substitute. **Always take it away.**
 
-## 4. Waiting
+### Reset between independent tests
+
+`session_reset` disconnects every bot and keeps the connection, so one test does not inherit the
+other's players. `close: "true"` ends the session instead, which is the only way to release one.
+
+## 4. Whole tests at once — `bot_run_scenario`
+
+Once the steps are known, hand the sequence over rather than driving it call by call. **On failure
+it reports which step failed, why, and what the server was doing at that moment** — which is the
+part that is tedious to reconstruct by hand.
+
+Steps: `spawn`, `despawn`, `move_to`, `break_block`, `attack_entity`, `use_block`, `use_entity`,
+`hold_item`, `drop_item`, `place_block`, `jump`, `sneak`, `sprint`, `look_at`, `assert_reachable`,
+`command`, `chat`, `console`, `click_slot`, `close_menu`, `wait_for`, `assert_block`,
+`assert_player`, `assert_event`, `assert_inventory`, `assert_message`.
+
+**There is no sleep step** — the same rule as below. Use `wait_for` and name what you are waiting
+for. `move_to` walks by default, driving the real physics loop, so pressure plates and movement
+listeners fire; `mode: "teleport"` is for setup placement, where you only want the bot to be
+somewhere.
+
+The GUI test is the shape worth remembering: `command`, then `wait_for` `inventory_open`, then
+`assert_inventory` with the slots you expect.
+
+## 5. Waiting
 
 **Never sleep.** Use `wait_for`. A fixed wait is a guess that is right on an idle server and wrong
 on a busy one. Conditions: `ticks`, `block_is`, `block_is_not`, `event`, `player_online`,
-`player_offline`, `player_near`, `inventory_open`, `inventory_contains`, `log_matches`.
+`player_offline`, `player_near`, `player_state`, `inventory_open`, `inventory_contains`,
+`log_matches`.
 
 - **Wait for `inventory_open` before reading a GUI.** A menu opening is not synchronous with the
   command that opened it
@@ -200,6 +250,8 @@ on a busy one. Conditions: `ticks`, `block_is`, `block_is_not`, `event`, `player
   framework does not re-initialise on reload, and you get something alive but half-assembled
 - **Overwriting the jar of a running server breaks classes that have not been loaded yet.** New
   code applies from the next restart
-- Bots need `online-mode=false` and `bungeecord: true` on the server, which is a test-harness
-  configuration. **Never point them at a server reachable from the internet** — anyone who can open
-  a socket to it can impersonate anyone
+- Bots need `online-mode=false` on the server, which is a test-harness configuration. **Never point
+  them at a server reachable from the internet** — anyone who can open a socket to it can
+  impersonate anyone. `bungeecord: true` in `spigot.yml` is **not** needed for a normal login; set
+  it only for a test that passes `clientIp` to spoof an address, and understand that it makes the
+  server trust the forwarding handshake

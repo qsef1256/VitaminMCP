@@ -43,7 +43,7 @@ Set this up once and CI needs no npm credentials at all. On npmjs.com, package s
 | | |
 |---|---|
 | Organization or user | `Backas03` |
-| Repository | `VitaminMCP-minecraft` |
+| Repository | `VitaminMCP` |
 | Workflow filename | `release.yml` — the name only, not the path |
 
 The workflow already grants `id-token: write`, and the npm CLI prefers OIDC over a token wherever

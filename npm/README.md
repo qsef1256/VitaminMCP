@@ -64,7 +64,7 @@ agent leaves its host, ports and token where this server reads them.
 
 ## What it downloads
 
-On first run, from [the GitHub release](https://github.com/Backas03/VitaminMCP-minecraft/releases)
+On first run, from [the GitHub release](https://github.com/Backas03/VitaminMCP/releases)
 matching this package's version, into `~/.vitaminmcp/jars/<version>/`:
 
 - `mcp-server.jar` (~2 MB) — waited for, since nothing works without it
@@ -83,6 +83,6 @@ Every downloaded file is checked against its pinned SHA-256. A file that does no
 rather than run.
 
 Full documentation, design notes and the plugin itself:
-**[github.com/Backas03/VitaminMCP-minecraft](https://github.com/Backas03/VitaminMCP-minecraft)**
+**[github.com/Backas03/VitaminMCP](https://github.com/Backas03/VitaminMCP)**
 
 MIT.

@@ -262,7 +262,7 @@ about happens.
 to drive it, as a skill that loads itself when a question calls for it:
 
 ```bash
-/plugin marketplace add Backas03/VitaminMCP-minecraft
+/plugin marketplace add Backas03/VitaminMCP
 ```
 
 ```bash
@@ -316,7 +316,7 @@ It checks the server is Paper 1.21+, puts the jar in `plugins/`, restarts, and c
 instead:
 
 **Download `VitaminMCP.jar`** from
-[Releases](https://github.com/Backas03/VitaminMCP-minecraft/releases/latest) into the server's
+[Releases](https://github.com/Backas03/VitaminMCP/releases/latest) into the server's
 `plugins/` — an ordinary Bukkit/Paper plugin, no server flags and no java agent to attach — and
 start the server.
 
@@ -464,7 +464,7 @@ address — the same failure whichever detail was missing.
 `npx` is a convenience, not a requirement. **Two artifacts**, plus the optional platform runner
 assets,
 are attached to every
-[release](https://github.com/Backas03/VitaminMCP-minecraft/releases/latest), and **each goes
+[release](https://github.com/Backas03/VitaminMCP/releases/latest), and **each goes
 somewhere different:**
 
 | File | Where | What |
