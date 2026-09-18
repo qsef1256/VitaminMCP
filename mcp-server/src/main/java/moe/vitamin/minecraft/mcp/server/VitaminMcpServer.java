@@ -135,7 +135,7 @@ public final class VitaminMcpServer {
             JsonNode payload = tools.call(name, params.get("arguments"));
             result.putArray("content").addObject()
                     .put("type", "text")
-                    .put("text", pretty(payload));
+                    .put("text", writeText(payload));
             result.put("isError", false);
         } catch (RuntimeException e) {
             result.putArray("content").addObject()
@@ -146,9 +146,10 @@ public final class VitaminMcpServer {
         return result;
     }
 
-    private static String pretty(JsonNode node) {
+    /** Compact on purpose: the reader is a model, and pretty-printing only costs its context. */
+    private static String writeText(JsonNode node) {
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(node);
+            return MAPPER.writeValueAsString(node);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             return String.valueOf(node);
         }

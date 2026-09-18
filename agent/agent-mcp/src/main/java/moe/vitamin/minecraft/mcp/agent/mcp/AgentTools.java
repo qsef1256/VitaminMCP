@@ -49,17 +49,18 @@ final class AgentTools {
 
         tools.add(tool("server_info",
                 "Server implementation, version, TPS, online players, installed plugins, and "
-                        + "capture statistics. Start here when you do not know what you are "
-                        + "looking at.",
+                        + "capture statistics. Start here.",
                 schema -> {}));
 
         tools.add(tool("events_summary",
                 "Counts captured events by type over a time window. ALWAYS call this before "
-                        + "events_query: it is small regardless of how busy the server is, and "
-                        + "it tells you which types are worth asking for in detail.",
+                        + "events_query — it stays small however busy the server is, and says "
+                        + "which types are worth querying in detail.",
                 properties -> {
-                    numberProperty(properties, "from", "Window start, epoch milliseconds. Omit for everything retained.");
-                    numberProperty(properties, "to", "Window end, epoch milliseconds. Omit for 'up to now'.");
+                    numberProperty(properties, "from",
+                            "Window start, epoch milliseconds. Omit for everything retained.");
+                    numberProperty(properties, "to",
+                            "Window end, epoch milliseconds. Omit for 'up to now'.");
                 }));
 
         tools.add(tool("events_query",
@@ -77,10 +78,9 @@ final class AgentTools {
                 }));
 
         tools.add(tool("logs_query",
-                "Searches captured server logs by severity and regular expression. There is no "
-                        + "'last N lines' tool; search for what you are looking for. The buffer "
-                        + "starts when the agent attaches, so a startup line written before that "
-                        + "may be absent even when the server logged it.",
+                "Searches captured server logs by severity and regular expression; there is no "
+                        + "'last N lines'. The buffer starts when the agent attaches, so a "
+                        + "startup line written before that may be absent.",
                 properties -> {
                     enumProperty(properties, "level", "Minimum severity.",
                             List.of("TRACE", "DEBUG", "INFO", "WARN", "ERROR"));
@@ -92,13 +92,11 @@ final class AgentTools {
                 }));
 
         tools.add(tool("exceptions_recent",
-                "Distinct exceptions, most recently seen first, each collapsed with an "
-                        + "occurrence count and when it was first seen. Stack traces are "
-                        + "omitted; pass 'hash' to fetch one. THIS COVERS THE CURRENT SERVER RUN "
-                        + "ONLY — the record lives in memory and starts empty at every boot, so "
-                        + "an empty answer means 'not since this server started', never 'this "
-                        + "has never happened'. For a fault a player reports as recurring, "
-                        + "reproduce it and watch the count rather than reading the absence.",
+                "Distinct exceptions, most recently seen first, collapsed with occurrence "
+                        + "counts and first-seen times; stack traces are omitted — pass 'hash' "
+                        + "to fetch one. THIS COVERS THE CURRENT SERVER RUN ONLY: the record "
+                        + "starts empty at every boot, so an empty answer means 'not since this "
+                        + "server started', never 'this has never happened'.",
                 properties -> {
                     numberProperty(properties, "limit", "Maximum groups.");
                     stringProperty(properties, "hash",
@@ -106,74 +104,69 @@ final class AgentTools {
                 }));
 
         tools.add(tool("state_query",
-                "Reads current server state directly rather than inferring it from events. "
-                        + "kind='player' needs 'target' (a player name) and optionally "
-                        + "'permissions'; kind='block' needs 'x','y','z' and optionally 'world'; "
+                "Reads current server state. kind='player' needs 'target', optionally "
+                        + "'permissions'. kind='block' needs x, y, z, optionally 'world'. "
                         + "kind='inventory' needs 'target' and reads the menu that player has "
-                        + "open — the only way to check a plugin GUI, since its contents exist "
-                        + "nowhere else. Each slot reports material, amount, display name, lore "
-                        + "and customModelData — the last is what a resource pack draws, so two "
-                        + "buttons of the same material and name can still be different icons. "
-                        + "Empty slots are omitted; 'size' and 'occupiedSlots' describe the "
-                        + "whole inventory. A 'view' of CRAFTING or CREATIVE means no menu is "
-                        + "open. kind='plugin' needs 'target' (a plugin name) and answers what "
-                        + "that plugin declares and how it is configured: its commands with the "
-                        + "permission node gating each one, the permissions it declares with "
-                        + "their defaults, and its LIVE config — what the running server "
-                        + "actually loaded, which answers 'is this switched on, and to what' and "
-                        + "is regularly not what the config file in a repository says. "
-                        + "Start here when a setting and the behavior disagree, but remember that a "
-                        + "loaded config value does not prove the plugin reads that key — source "
-                        + "inspection may still be needed to detect a decorative setting. Also start "
-                        + "here for 'it works for admins but not for players' — it is the only way to learn which node "
-                        + "to test, since kind='player' can test a node but never list one. A "
-                        + "command's 'permission' is null when its plugin.yml does not declare "
-                        + "one, which is common — plenty of plugins check a node in code instead, "
-                        + "so read the 'permissions' list too rather than concluding a command is "
-                        + "ungated. Config values whose key looks like a secret read "
-                        + "'(redacted)'; the key is still shown, so ask a human for the value.",
+                        + "open — THE ONLY PLACE A PLUGIN GUI'S CONTENTS EXIST. Slots report "
+                        + "material, amount, name, lore and customModelData (what a resource "
+                        + "pack draws — same-material buttons can still be different icons); "
+                        + "empty slots are omitted; a 'view' of CRAFTING or CREATIVE means no "
+                        + "menu is open. kind='plugin' needs 'target' and answers its commands "
+                        + "with the permission gating each, its declared permissions, and its "
+                        + "LIVE loaded config — often not what the file in a repository says; "
+                        + "secret-looking values read '(redacted)'. A command often carries no "
+                        + "'permission' because its plugin checks a node in code instead — read "
+                        + "the 'permissions' list too before concluding a command is ungated.",
                 properties -> {
                     enumProperty(properties, "kind", "What to read.",
                             List.of("player", "block", "inventory", "plugin"));
                     stringProperty(properties, "target",
-                            "Player name, for kind='player' and kind='inventory'. Plugin name, "
-                                    + "for kind='plugin'.");
+                            "Player name for kind='player'/'inventory'; plugin name for "
+                                    + "kind='plugin'.");
                     arrayProperty(properties, "permissions",
                             "Permission nodes to test. They can only be tested, not listed.");
                     stringProperty(properties, "world", "World name, for kind='block'.");
                     numberProperty(properties, "x", "Block X, for kind='block'.");
                     numberProperty(properties, "y", "Block Y, for kind='block'.");
                     numberProperty(properties, "z", "Block Z, for kind='block'.");
-                    stringProperty(properties, "which",
-                            "For kind='inventory': 'menu' (default) for the open GUI, or "
-                                    + "'player' for the player's own inventory.");
+                    enumProperty(properties, "which",
+                            "For kind='inventory': the open GUI (default), or the player's own "
+                                    + "inventory.",
+                            List.of("menu", "player"));
                     numberProperty(properties, "limit",
                             "For kind='inventory': most slots to list, capped at "
                                     + budget.maxItems() + ".");
                 }));
 
         tools.add(tool("wait_for",
-                "Blocks until something becomes true, then returns. Use this instead of "
-                        + "waiting or retrying yourself — a fixed wait is a guess about timing "
-                        + "that is right on an idle server and wrong on a busy one. On timeout "
-                        + "the response carries the events and log lines from that moment, "
-                        + "which usually explain it. Condition types: ticks (count), block_is / "
-                        + "block_is_not (world,x,y,z,material), event (eventType, player), "
-                        + "player_online / player_offline (name), player_near (name,x,y,z,distance), "
-                        + "inventory_open (name, title), inventory_contains (name, material, slot, "
-                        + "which), log_matches (pattern, level). Wait for inventory_open before "
-                        + "reading a menu — opening one is not synchronous with the command that "
-                        + "caused it. Use log_matches for work that changes nothing observable, "
-                        + "such as a plugin loading a player's data asynchronously: waiting a "
-                        + "fixed number of ticks for that is a sleep by another name. What this "
-                        + "CANNOT wait for is a message arriving at a player: chat, action bar "
-                        + "and title are sent to a client and never reach the server-side agent, "
-                        + "so no condition here can see them. Wait for those on the bot side "
-                        + "instead — a scenario's assert_message waits, and bot_inspect reads "
-                        + "what has arrived so far.",
+                "Blocks until a condition holds, then returns. USE THIS INSTEAD OF WAITING OR "
+                        + "RETRYING YOURSELF — a fixed wait is right on an idle server and wrong "
+                        + "on a busy one. On timeout the response carries the events and log "
+                        + "lines from that moment. Wait for inventory_open before reading a "
+                        + "menu — opening one is not synchronous with the command that caused "
+                        + "it; use log_matches for async work that changes nothing observable. "
+                        + "Chat, action bar and title NEVER reach the server-side agent, so no "
+                        + "condition here can see them — assert those on the bot side "
+                        + "(assert_message, bot_inspect).",
                 properties -> {
-                    stringProperty(properties, "condition",
-                            "Condition type, e.g. 'block_is_not' or 'event'.");
+                    enumProperty(properties, "condition",
+                            "What to wait for. Parameters by condition: ticks (count); "
+                                    + "block_is / block_is_not (world, x, y, z, material); "
+                                    + "event (eventType, player, sinceSequence); "
+                                    + "player_online / player_offline (name); "
+                                    + "player_state (name, plus online / gameMode / op values); "
+                                    + "player_near (name, x, y, z, distance); "
+                                    + "inventory_open (name, title); "
+                                    + "inventory_contains (name, material, slot, which); "
+                                    + "log_matches (pattern, level).",
+                            List.of(WaitCondition.TICKS,
+                                    WaitCondition.BLOCK_IS, WaitCondition.BLOCK_IS_NOT,
+                                    WaitCondition.EVENT,
+                                    WaitCondition.PLAYER_ONLINE, WaitCondition.PLAYER_OFFLINE,
+                                    WaitCondition.PLAYER_STATE, WaitCondition.PLAYER_NEAR,
+                                    WaitCondition.INVENTORY_OPEN,
+                                    WaitCondition.INVENTORY_CONTAINS,
+                                    WaitCondition.LOG_MATCHES));
                     numberProperty(properties, "timeoutMillis",
                             "How long to wait before giving up. Default 10000, capped at 60000.");
                     stringProperty(properties, "eventType", "For condition='event'.");
@@ -187,8 +180,10 @@ final class AgentTools {
                     numberProperty(properties, "slot",
                             "For inventory_contains: check this slot only. Omit to accept the "
                                     + "material anywhere.");
-                    stringProperty(properties, "which",
-                            "For inventory_contains: 'menu' (default) or 'player'.");
+                    enumProperty(properties, "which",
+                            "For inventory_contains: the open menu (default) or the player's "
+                                    + "own inventory.",
+                            List.of("menu", "player"));
                     stringProperty(properties, "world", "World name. Defaults to the main world.");
                     numberProperty(properties, "x", "Coordinate, where the condition takes one.");
                     numberProperty(properties, "y", "Coordinate, where the condition takes one.");
@@ -199,46 +194,33 @@ final class AgentTools {
                             "For condition='event': only count events at or after this sequence. "
                                     + "Omit to count only events that happen during the wait.");
                     stringProperty(properties, "pattern",
-                            "For condition='log_matches': a Java regular expression matched "
-                                    + "against the message. Only lines written during the wait "
-                                    + "count, so a match is something that just happened.");
-                    stringProperty(properties, "level",
-                            "For condition='log_matches': minimum severity — TRACE, DEBUG, INFO, "
-                                    + "WARN or ERROR. Omit to match any.");
+                            "For condition='log_matches': a Java regular expression. Only lines "
+                                    + "written during the wait count.");
+                    enumProperty(properties, "level",
+                            "For condition='log_matches': minimum severity. Omit to match any.",
+                            List.of("TRACE", "DEBUG", "INFO", "WARN", "ERROR"));
                 }));
 
         if (!readOnly) {
             tools.add(tool("command_exec",
-                    "Runs a command on the server, as the console by default. This CHANGES the "
-                            + "server. Returns whether a handler accepted it plus whatever it "
-                            + "logged, which is usually where the real answer is — many commands "
-                            + "report failure in their output while still succeeding formally. "
-                            + "'dispatched': false always carries a 'reason' saying nothing ran "
-                            + "and which of the two causes it was — no such command, or the "
-                            + "sender was not permitted — so it never has to be read as a "
-                            + "command that ran and did nothing. WITH 'as', THIS RESPONSE CANNOT "
-                            + "TELL YOU WHETHER THE COMMAND WORKED. A command run as a player "
-                            + "answers that player, not the console, so a plugin that opened a "
-                            + "menu, a plugin that refused in chat or on the action bar, and a "
-                            + "plugin still computing an async reply all return the same "
-                            + "'dispatched': true with an empty 'output'. A plugin that refuses "
-                            + "and returns true is the commonest shape of 'the command does "
-                            + "nothing', and it looks like success here. Read what the player was "
-                            + "sent with bot_inspect before concluding anything. Note also that "
-                            + "'as' dispatches directly and does NOT fire "
-                            + "PlayerCommandPreprocessEvent, so a plugin that cancels, rewrites "
-                            + "or logs commands in that listener is not exercised — have a bot "
-                            + "send the command itself when that path is what is under test.",
+                    "Runs a command, as the console by default. This CHANGES the server. "
+                            + "Returns whether a handler accepted it plus whatever it logged — "
+                            + "often where the real answer is. 'dispatched': false always "
+                            + "carries a 'reason'. WITH 'as', THIS RESPONSE CANNOT TELL YOU "
+                            + "WHETHER THE COMMAND WORKED: the reply goes to that player, so a "
+                            + "refusal, an opened menu and a pending async reply all look like "
+                            + "'dispatched': true with empty 'output' — read what the player "
+                            + "was sent with bot_inspect before concluding anything. 'as' also "
+                            + "skips PlayerCommandPreprocessEvent, so have a bot send the "
+                            + "command itself when that listener is under test.",
                     properties -> {
                         stringProperty(properties, "command",
                                 "The command, with or without a leading slash.");
                         stringProperty(properties, "as",
                                 "Player name to run as. Omit to run as the console. Vanilla "
-                                        + "commands work here too, and on the Paper versions that "
-                                        + "gate them behind minecraft.command.<name> a player who "
-                                        + "is not op is refused — which is the point when the "
-                                        + "permission is what is under test. Where a command must "
-                                        + "run regardless, op the player or use the console.");
+                                        + "commands may be gated behind minecraft.command.<name> "
+                                        + "for a non-op player — op the player or use the "
+                                        + "console where the command must run regardless.");
                     }));
         }
 

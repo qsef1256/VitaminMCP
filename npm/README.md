@@ -7,11 +7,9 @@ This package is the launcher. It fetches the jars it needs on first run and spea
 MCP client — it is not the whole product on its own: the agent is a Paper plugin, and it goes on
 the Minecraft server.
 
-```bash
-claude mcp add vitaminmcp -- npx -y vitaminmcp
-```
-
-Or in `.mcp.json`, `claude_desktop_config.json`, or whatever your client calls it:
+It speaks plain stdio, so it works in any MCP client — Claude Code, Cursor, Codex, Gemini CLI,
+Windsurf, Claude Desktop, VS Code. Register it wherever your client keeps MCP servers
+(`.mcp.json`, `.cursor/mcp.json`, `~/.gemini/settings.json`, `claude_desktop_config.json`, …):
 
 ```json
 {
@@ -24,8 +22,14 @@ Or in `.mcp.json`, `claude_desktop_config.json`, or whatever your client calls i
 }
 ```
 
-Then, in Claude Code, `/mcp__vitaminmcp__setup` walks through the other half — putting
-`VitaminMCP.jar` in the server's `plugins/`, restarting it, and connecting. Or just ask:
+Clients with a CLI take the same thing as a command, e.g.
+`claude mcp add vitaminmcp -- npx -y vitaminmcp` or
+`codex mcp add vitaminmcp -- npx -y vitaminmcp`.
+
+The server publishes a `setup` MCP prompt that walks through the other half — putting
+`VitaminMCP.jar` in the Minecraft server's `plugins/`, restarting it, and connecting. In Claude
+Code that surfaces as `/mcp__vitaminmcp__setup` (named after whatever the server was registered
+as — `/mcp` lists it); in any client, just ask:
 
 > **Prompt:** Set up VitaminMCP on my Minecraft server at ~/servers/test and connect to it.
 
@@ -39,12 +43,13 @@ agent leaves its host, ports and token where this server reads them.
 - Open, read, click and assert on inventories and plugin GUIs
 - Wait for events and conditions instead of sleeping
 - Read live server state: events, logs, exceptions, permissions
-- Paper / Purpur 1.21 through 1.21.8, from one install
+- Paper / Purpur 1.21 through 26.1, from one install
 
 ## Requires
 
 - **Java 21 or later** on this machine — the jars run on the JVM. Point `JAVA_HOME` at it, or have
-  `java` on `PATH`
+  `java` on `PATH`. (The Paper server itself needs Java 25 from 26.1 on; that is Paper's
+  requirement, and the agent loads there unchanged)
 - **Node 18.17 or later** when using the source runner fallback. If Node is absent, the launcher
   selects a pinned platform runner asset instead.
 - **Paper 1.21 or later** on the Minecraft server, with `VitaminMCP.jar` in its `plugins/`

@@ -234,24 +234,43 @@ export function useEntity(bot, name, x, y, z, radius, type) {
     );
   }
 
-  // Both packets, in this order, because that is what a real client sends and what the Java
-  // runner reproduces: a plugin listening only for the second sees nothing without the first.
-  bot._client.write('use_entity', {
-    target: entityId,
-    mouse: INTERACT_AT,
-    x: 0.0,
-    y: 1.0,
-    z: 0.0,
-    hand: MAIN_HAND,
-    sneaking: false,
-  });
-  bot._client.write('use_entity', {
-    target: entityId,
-    mouse: INTERACT,
-    hand: MAIN_HAND,
-    sneaking: false,
-  });
+  if (interactCarriesMouseButton(bot)) {
+    // Both packets, in this order, because that is what a real client sends and what the Java
+    // runner reproduces: a plugin listening only for the second sees nothing without the first.
+    bot._client.write('use_entity', {
+      target: entityId,
+      mouse: INTERACT_AT,
+      x: 0.0,
+      y: 1.0,
+      z: 0.0,
+      hand: MAIN_HAND,
+      sneaking: false,
+    });
+    bot._client.write('use_entity', {
+      target: entityId,
+      mouse: INTERACT,
+      hand: MAIN_HAND,
+      sneaking: false,
+    });
+  } else {
+    // 26.1: one packet with a hand and a hit position; attacks have their own packet.
+    bot._client.write('use_entity', {
+      target: entityId,
+      hand: MAIN_HAND,
+      location: { x: 0.0, y: 1.0, z: 0.0 },
+      sneaking: false,
+    });
+  }
   return entityId;
+}
+
+/** Through 1.21.11 `use_entity` has a `mouse` field; from 26.1 it has a `location` instead. */
+function interactCarriesMouseButton(bot) {
+  const fields = bot.registry?.protocol?.play?.toServer?.types?.packet_use_entity?.[1];
+  if (!Array.isArray(fields)) {
+    throw new Error('The protocol definition for use_entity is missing, so the bot cannot interact with entities.');
+  }
+  return fields.some((field) => field?.name === 'mouse');
 }
 
 /** Left-clicks the nearest tracked entity. */

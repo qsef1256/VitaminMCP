@@ -117,6 +117,13 @@ log-buffer-size: 20000
 # Distinct exceptions kept, each with its occurrence count and first-seen time.
 max-exception-groups: 1000
 
+# Ceiling on one query response: records and serialized bytes, whichever fills first. Every
+# query pages with nextCursor, so these trade round trips against response size. The reader is
+# an AI client whose context window pays for every byte — raising max-response-bytes mostly
+# spends that context, it does not show more history than paging would.
+max-response-items: 200
+max-response-bytes: 25600
+
 # High-frequency events — PlayerMoveEvent, BlockPhysicsEvent, ChunkLoadEvent, entity movement —
 # are not captured by default. BlockPhysicsEvent alone can fire thousands of times per tick and
 # would overwrite the entire buffer within seconds, discarding everything you actually wanted.

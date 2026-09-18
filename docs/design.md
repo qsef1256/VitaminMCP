@@ -3,7 +3,7 @@
 Design decisions and their reasons, for an MCP server plus protocol-bot test harness aimed at
 Minecraft plugin automation.
 
-This document holds the **why**. Rules and invariants are in `CONTRIBUTING.md`.
+This document holds the **why**. How to build and test is in `CONTRIBUTING.md`.
 
 ---
 
@@ -229,7 +229,8 @@ A plugin jar loads into whatever JVM the server chose. Required JVM per Minecraf
 | 1.13 – 1.16.5 | Java 8+ |
 | 1.17 | Java 16+ |
 | 1.18 – 1.20.4 | Java 17+ |
-| 1.20.5+ | Java 21+ |
+| 1.20.5 – 1.21.11 | Java 21+ |
+| 26.1+ | Java 25+ |
 
 Put an agent compiled with Java 21 into Paper 1.13.2 and it dies like this:
 
@@ -272,8 +273,8 @@ revert is the single `vitaminmcp.server-jvm-target`.
 
 - The `agent-legacy` adapter module is unnecessary in its entirety
 - A single jar works across the whole supported range on the Bukkit/Paper API alone
-- `io.papermc.paper:paper-api` compiles against the floor (1.21.8) — API added later is simply not
-  on the classpath, so it cannot be used by accident
+- `io.papermc.paper:paper-api` compiles against the floor (1.21 since §5.6) — API added later is
+  simply not on the classpath, so it cannot be used by accident
 - Servers below 1.21.7 are out of scope
 - `agent-*` and `contract` state `--release 21` **explicitly**. It currently equals the toolchain
   value but means something different: the toolchain is what we compile with, `release` is what the
@@ -287,7 +288,7 @@ Everything floor-related derives from **one place — `FLOOR` in
 and the `--release` value all come from it.
 
 ```kotlin
-const val FLOOR = "1.21.8"   // the only line to change
+const val FLOOR = "1.21"   // the only line to change
 ```
 
 The MC↔Java table is encoded, so **an impossible combination is rejected by the build.** Set
@@ -398,7 +399,7 @@ the LLM useless.**
    requested
 2. **Give the aggregate first.** Show counts by type via `events_summary`, then steer toward
    querying only the types that matter. This two-step structure is the core of it
-3. **Nail a response token budget into the tool itself.** 200 records / 50KB by default, plus cursor
+3. **Nail a response token budget into the tool itself.** 200 records / 25KB by default (configurable), plus cursor
    pagination
 4. **Ring buffer plus asynchronous serialization.** The MONITOR listener builds only a lightweight
    record and pushes it onto a lock-free queue; a separate thread serializes. Building JSON on the
@@ -433,15 +434,10 @@ The full stack trace is returned only on explicit request.
 
 ## 10. The MCP tool list
 
-```
-server_info()                              version, plugins, TPS, players online
-events_summary(since, until)               counts by type ← always start here
-events_query(types[], player?, cursor)     detail
-logs_query(level, pattern, since, cursor)  regex search
-exceptions_recent(limit)                   grouped exceptions ← most used in practice
-state_query(kind, target)                  scoreboard / permissions / inventory
-command_exec(cmd, as)                      console or player command (off by default)
-```
+The current tools and their parameters live where they cannot drift: the code
+(`AgentTools.listTools()`, `SessionTools.listTools()`) and [usage.md](usage.md). An earlier
+revision of this section duplicated the signatures here and they went stale immediately — this
+document keeps only the rules that shaped them.
 
 ### Design rules
 
@@ -526,7 +522,7 @@ response** (how long it took, what came back). Two, because `wait_for` can hold 
 a minute — log only on completion and the console is silent while it runs, leaving a stuck call
 indistinguishable from no call at all.
 
-Arguments and responses are truncated. The response budget is 50KB and the console is not where you
+Arguments and responses are truncated. The response budget is 25KB and the console is not where you
 read it; the client already has the full payload.
 
 Controlled by `activity-log: full | summary | off`. **Even at `off`, refused tokens and
@@ -705,12 +701,19 @@ lazy getters: free at runtime, but esbuild resolves each one while bundling and 
 That is how the runner asset went from an 88MB jar to a 564MB executable when the bot side moved to
 mineflayer, and every user who has no Node installed downloads it.
 
-`scripts/slim-minecraft-data.mjs` replaces the versions outside the supported line with a module
-that throws, taking the asset to 134MB. The keep-set is **derived from `data.js`, not from
-directory names**, because a version entry borrows files from older ones — 1.21.x reads out of
-pc/1.16.1, pc/1.20, pc/1.20.2, pc/1.20.3 and pc/1.20.5 — so an obvious prune builds cleanly and
-then fails on a bot that asks for a recipe. The supported line comes from `SupportedVersions.FLOOR`
-rather than being written down a second time.
+`scripts/slim-minecraft-data.mjs` replaces the versions below the floor with a module that throws,
+taking the asset to 134MB (147MB once 26.1 joined). The keep-set is **derived from `data.js`, not
+from directory names**, because a version entry borrows files from older ones — 1.21.x reads out
+of pc/1.16.1, pc/1.20, pc/1.20.2, pc/1.20.3 and pc/1.20.5 — so an obvious prune builds cleanly and
+then fails on a bot that asks for a recipe. The floor comes from `SupportedVersions.FLOOR` rather
+than being written down a second time.
+
+The keep-set is **the floor and everything above it**, not the floor's own line. It was `1.21.*`
+at first, which was the same set until 1.21.11 was followed by 26.1 rather than 1.21.12: a runner
+built that way would have refused the newest server anyone runs while every other part of the
+project supported it. A unit test now checks the bundle against `versions.yaml` entry by entry,
+resolving each through its protocol the way the runner does, so the matrix cannot again promise a
+version the runner does not carry.
 
 The server-list ping names its version for the same reason. It happens before anything knows what
 the server speaks, so minecraft-protocol otherwise falls back to the newest version it has heard of

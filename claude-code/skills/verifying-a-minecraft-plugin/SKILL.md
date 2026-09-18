@@ -33,6 +33,8 @@ Pass only what differs:
   others, so bots stay connected. Name them (`lobby`, `survival`) and pass `session` to every later
   call — it is optional only while exactly one is open
 - `port` — the Minecraft port bots connect to, which on a proxied network is the proxy's
+- `minecraftProtocol` — the backend's numeric Minecraft protocol, only when a proxy's status ping
+  echoes the request protocol instead of advertising the backend's
 - `host` and `token` — **required together for a server on another machine.** A token minted
   locally says nothing about a remote server and is deliberately not sent there. The token is the
   `auth-token` in that server's `plugins/VitaminMCP/config.yml`; it is a credential, so ask the
@@ -40,8 +42,9 @@ Pass only what differs:
 - `tls: "true"` when the remote agent serves HTTPS, plus `tlsFingerprint` if its certificate is
   self-signed. The agent prints both at startup
 
-**If nothing answers, the server has not got the plugin.** The `setup` prompt — in Claude Code,
-`/mcp__vitaminmcp__setup` — installs it.
+**If nothing answers, the server has not got the plugin.** The `setup` prompt installs it — with
+this skill's plugin install that is `/mcp__plugin_vitaminmcp_vitaminmcp__setup` (with a plain
+`claude mcp add vitaminmcp`, `/mcp__vitaminmcp__setup`), or the user can simply ask for setup.
 
 **`session_start`'s own response carries `agentTools`** — the real parameters of the proxied tools,
 which depend on the agent. Read it: a read-only install (`read-only: true` is the default) exposes
@@ -156,18 +159,29 @@ exist as a server-side inventory, so nothing else can show it.
 
 ## 3. Driving bots
 
-`bot_spawn` returns once the bot is standing in the world. **A bot's UUID is derived from its
-name**, so the same name is the same player every run and permission-dependent behaviour is
-reproducible.
+`bot_spawn` returns once the bot is standing in the world. Offline authentication is the default;
+its UUID is derived from the name, so the same name is the same player every run and
+permission-dependent behaviour is reproducible.
 
-### The same name means the server remembers them
+For a server that must keep `online-mode=true`, use a dedicated Microsoft account:
+
+```json
+bot_spawn {"name":"RealProfileName", "auth":"microsoft", "account":"qa-primary"}
+```
+
+The first call returns a device-login URL and code. Complete the browser login, then repeat the
+same call. `account` is only a local cache key and defaults to `name`; the authenticated Java
+profile name must match `name`. Do not put passwords or access tokens in a tool call. Both auth
+modes require `read-only: false` in the agent config before bots or scenarios can change the server.
+
+### The same offline name means the server remembers them
 
 That reproducibility cuts both ways: inventory, position, advancements and anything a plugin stored
 against that UUID **survive from earlier runs.** A bot you have used before is not a fresh player,
 so "it has the item" may be left over rather than just granted, and a first-join path will not fire.
 
-Use an unused name when a first join is what is being tested, and clear what you left behind with
-`clear <name>` through `command_exec`.
+For offline auth, use an unused name when a first join is what is being tested, and clear what you
+left behind with `clear <name>` through `command_exec`.
 
 ### The first ~2 seconds after joining are locked out
 
@@ -250,8 +264,8 @@ on a busy one. Conditions: `ticks`, `block_is`, `block_is_not`, `event`, `player
   framework does not re-initialise on reload, and you get something alive but half-assembled
 - **Overwriting the jar of a running server breaks classes that have not been loaded yet.** New
   code applies from the next restart
-- Bots need `online-mode=false` on the server, which is a test-harness configuration. **Never point
-  them at a server reachable from the internet** — anyone who can open a socket to it can
-  impersonate anyone. `bungeecord: true` in `spigot.yml` is **not** needed for a normal login; set
-  it only for a test that passes `clientIp` to spoof an address, and understand that it makes the
-  server trust the forwarding handshake
+- Offline bots need `online-mode=false`, which is a test-harness configuration. **Never point that
+  server at the internet** — anyone who can open a socket can impersonate anyone. Keep
+  `online-mode=true` and use Microsoft auth for a real-account smoke test. `bungeecord: true` in
+  `spigot.yml` is **not** needed for a normal login; set it only for an offline test that passes
+  `clientIp`, and understand that it makes the server trust the forwarding handshake

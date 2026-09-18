@@ -315,3 +315,79 @@ jobs:
           fi
           mcp-publisher login github-oidc
           mcp-publisher publish
+
+      # Mirrors the release to Modrinth — Modrinth has no GitHub sync of its own, so this step is
+      # the sync: one Modrinth version per tag, serving the same plugin jar the GitHub release
+      # serves. Guarded like everything above: a version already on Modrinth is left alone (the
+      # jar is not byte-reproducible, so re-uploading would publish different bytes under the same
+      # version), and a repository without the token — a fork, or before the secret is set — skips
+      # rather than fails.
+      #
+      # The supported floor is 1.21 (docs/design.md §5.4); the ceiling is the newest entry in
+      # versions.yaml, so adding a version to the matrix is still the only step in supporting one.
+      - name: Publish to Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_SLUG: vitaminmcp
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MODRINTH_TOKEN}" ]; then
+            echo "::notice::MODRINTH_TOKEN is not set; skipping the Modrinth publish."
+            exit 0
+          fi
+
+          # Authorized reads, because a project still in review is invisible to the public API —
+          # the token therefore needs the read-projects and read-versions scopes too.
+          published=$(curl -fsSL -H "Authorization: ${MODRINTH_TOKEN}" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_SLUG}/version" \
+            | node -p "JSON.parse(require('fs').readFileSync(0)).some((v) => v.version_number === process.env.VERSION)")
+          if [ "$published" = "true" ]; then
+            echo "Modrinth already has ${VERSION}; nothing to publish."
+            exit 0
+          fi
+
+          # Version creation wants the project id, not the slug.
+          project_id=$(curl -fsSL -H "Authorization: ${MODRINTH_TOKEN}" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_SLUG}" \
+            | node -p "JSON.parse(require('fs').readFileSync(0)).id")
+
+          # The same notes the GitHub release shows, which on a rerun are the published notes
+          # rather than whatever --generate-notes would produce today.
+          gh release view "${VERSION}" --json body --jq .body > modrinth-changelog.md
+
+          # Every release between the floor and the ceiling, in Modrinth's own list of game
+          # versions: the range crosses from 1.21.11 into 26.1, so it cannot be spelled by counting.
+          ceiling=$(sed -n 's/^  - id: "\(.*\)"$/\1/p' versions.yaml | tail -1)
+          curl -fsSL "https://api.modrinth.com/v2/tag/game_version" > modrinth-game-versions.json
+          node -e "
+            const fs = require('fs');
+            const releases = JSON.parse(fs.readFileSync('modrinth-game-versions.json', 'utf8'))
+              .filter((tag) => tag.version_type === 'release')
+              .map((tag) => tag.version);
+            const newest = releases.indexOf(process.argv[2]);
+            const oldest = releases.indexOf('1.21');
+            if (newest < 0 || oldest < 0 || newest > oldest) {
+              throw new Error('Modrinth does not list ' + process.argv[2] + ' as a release above 1.21.');
+            }
+            const gameVersions = releases.slice(newest, oldest + 1).reverse();
+            fs.writeFileSync('modrinth-version.json', JSON.stringify({
+              project_id: process.argv[1],
+              name: process.env.VERSION,
+              version_number: process.env.VERSION,
+              changelog: fs.readFileSync('modrinth-changelog.md', 'utf8'),
+              dependencies: [],
+              game_versions: gameVersions,
+              version_type: 'release',
+              loaders: ['paper', 'purpur'],
+              featured: false,
+              file_parts: ['file'],
+            }));
+          " "$project_id" "$ceiling"
+
+          curl -fsS -X POST "https://api.modrinth.com/v2/version" \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -F "data=<modrinth-version.json" \
+            -F "file=@build/dist/VitaminMCP.jar;type=application/java-archive" \
+            -o /dev/null
+          echo "Published ${VERSION} to Modrinth."

@@ -16,9 +16,11 @@ import { Dispatch } from './src/dispatch.mjs';
 import * as protocol from './src/protocol.mjs';
 import { pingProtocol, versionForProtocol } from './src/version.mjs';
 
-// stdout belongs exclusively to the runner protocol. Authentication dependencies use console.info.
-console.log = console.error;
-console.info = console.error;
+// stdout is the protocol channel; a dependency's console.log (mineflayer did this on 26.1, with a
+// stack trace) desynchronises every later reply. `write` below is the only path to stdout.
+for (const level of ['log', 'info', 'debug']) {
+  console[level] = (...messages) => process.stderr.write(`${messages.map(String).join(' ')}\n`);
+}
 
 async function main() {
   const argv = process.argv.slice(2);

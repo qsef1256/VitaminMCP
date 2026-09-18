@@ -63,7 +63,7 @@ try {
     plugins: [slimMinecraftData(path.join(root, 'node_modules', 'minecraft-data'), floor)],
   });
   process.stdout.write(
-    `bundle ${(await fs.stat(bundle)).size / 1048576 | 0} MB (minecraft-data trimmed to ${floor}.x)\n`,
+    `bundle ${(await fs.stat(bundle)).size / 1048576 | 0} MB (minecraft-data trimmed to ${floor} and later)\n`,
   );
   await fs.writeFile(config, JSON.stringify({
     main: bundle,

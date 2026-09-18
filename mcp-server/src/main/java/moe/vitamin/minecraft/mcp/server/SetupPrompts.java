@@ -9,9 +9,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * The prompts this server offers, which a client surfaces as commands.
  *
  * <p>Installing the agent is the one part of this that a tool cannot do: it happens on the server,
- * before anything here can connect to it. So it is written down as a prompt instead — in Claude
- * Code that is {@code /mcp__vitaminmcp__setup} — and the client's own agent does the work, with
- * this server's tools to check it afterwards.
+ * before anything here can connect to it. So it is written down as a prompt instead — surfaced by
+ * the client under the server's registered name, e.g. {@code /mcp__vitaminmcp__setup} or, via the
+ * Claude Code plugin, {@code /mcp__plugin_vitaminmcp_vitaminmcp__setup} — and the client's own
+ * agent does the work, with this server's tools to check it afterwards.
  */
 final class SetupPrompts {
 
@@ -116,9 +117,11 @@ final class SetupPrompts {
                     reachable from the internet, because anyone who can open a socket can then \
                     impersonate anyone.
 
-                    6. Call session_start with no arguments. On this machine it finds the host, \
-                    both ports and the token by itself. Then report the server version, the TPS \
-                    and the plugins it found.
+                    6. For a direct server on this machine, call session_start with no arguments; \
+                    it finds the host, both ports and token. For a proxied network, pass the \
+                    proxy's Minecraft port and the backend agent's mcpPort. If the proxy echoes \
+                    the ping request's protocol, also pass the backend's minecraftProtocol. Then \
+                    report the server version, TPS and plugins it found.
 
                     7. Spawn one bot with the chosen auth mode to prove the path end to end, then \
                     disconnect it with session_reset.

@@ -108,7 +108,7 @@ if (modulePath == ":contract") {
                     buildString {
                         appendLine("$modulePath must have no external dependencies, but found:")
                         offenders.forEach { appendLine("    $it") }
-                        append("See invariant 2 in CONTRIBUTING.md.")
+                        append("See the module rules in CONTRIBUTING.md.")
                     }
                 )
             }

@@ -1,6 +1,6 @@
 {
   "name": "vitaminmcp",
-  "version": "3.0.1",
+  "version": "3.1.1",
   "mcpName": "io.github.Backas03/vitaminmcp",
   "description": "MCP server for testing Minecraft plugins: drives a real Paper server and real protocol bots from an AI agent.",
   "keywords": [

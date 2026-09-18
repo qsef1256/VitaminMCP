@@ -1,0 +1,88 @@
+# Mirrors the whole GitHub release back catalogue to Modrinth. The release workflow publishes each
+# new tag as it is cut; this one exists to carry the versions cut before the Modrinth project did,
+# and can be re-run safely — versions Modrinth already has are left alone.
+#
+# Publishes oldest-first, because Modrinth orders versions by upload time: the back catalogue has
+# to land under the current release, not on top of it.
+
+name: Modrinth backfill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Full history: each release's game-version range is read from versions.yaml at its own tag,
+      # so a 1.x release is not published claiming support the current matrix has and it never had.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Publish missing versions
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_SLUG: vitaminmcp
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Authorized reads, because a project still in review is invisible to the public API.
+          project_id=$(curl -fsSL -H "Authorization: ${MODRINTH_TOKEN}" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_SLUG}" \
+            | node -p "JSON.parse(require('fs').readFileSync(0)).id")
+          have=$(curl -fsSL -H "Authorization: ${MODRINTH_TOKEN}" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_SLUG}/version" \
+            | node -p "JSON.parse(require('fs').readFileSync(0)).map((v) => v.version_number).join('\n')")
+
+          for tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName' | sort -V); do
+            if grep -qx "$tag" <<<"$have"; then
+              echo "$tag is already on Modrinth; leaving it alone."
+              continue
+            fi
+
+            ids=$(git show "$tag:versions.yaml" | sed -n 's/^  - id: "\(.*\)"$/\1/p' | sort -V)
+            min=$(head -1 <<<"$ids")
+            max=$(tail -1 <<<"$ids")
+
+            gh release view "$tag" --json body --jq .body > changelog.md
+            gh release download "$tag" --pattern VitaminMCP.jar --output VitaminMCP.jar --clobber
+
+            # The matrix floor has been 1.21.1 since 1.3.0 while the declared floor is 1.21 (the
+            # two share what matters below the agent); earlier tags really did start higher.
+            node -e "
+              const fs = require('fs');
+              const patchOf = (v) => Number(v.split('.')[2] ?? 0);
+              const [min, max] = process.argv.slice(2, 4);
+              const gameVersions = min === '1.21.1' ? ['1.21'] : [];
+              for (let p = patchOf(min); p <= patchOf(max); p++) gameVersions.push('1.21.' + p);
+              fs.writeFileSync('version.json', JSON.stringify({
+                project_id: process.argv[1],
+                name: process.argv[4],
+                version_number: process.argv[4],
+                changelog: fs.readFileSync('changelog.md', 'utf8'),
+                dependencies: [],
+                game_versions: gameVersions,
+                version_type: 'release',
+                loaders: ['paper', 'purpur'],
+                featured: false,
+                file_parts: ['file'],
+              }));
+            " "$project_id" "$min" "$max" "$tag"
+
+            curl -fsS -X POST "https://api.modrinth.com/v2/version" \
+              -H "Authorization: ${MODRINTH_TOKEN}" \
+              -F "data=<version.json" \
+              -F "file=@VitaminMCP.jar;type=application/java-archive" \
+              -o /dev/null
+            echo "Published $tag to Modrinth ($min through $max)."
+          done

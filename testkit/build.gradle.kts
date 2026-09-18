@@ -26,6 +26,7 @@ tasks.test {
         "vitaminmcp.protocol",
         "vitaminmcp.paperCache",
         "vitaminmcp.repeat",
+        "vitaminmcp.serverJavaHome",
     ).forEach { key ->
         providers.systemProperty(key).orNull?.let { systemProperty(key, it) }
     }

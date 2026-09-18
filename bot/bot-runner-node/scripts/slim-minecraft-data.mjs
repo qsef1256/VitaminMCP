@@ -41,20 +41,31 @@ const ALWAYS = /[\\/]data[\\/](pc|bedrock)[\\/]common[\\/]/;
 const ANY_DATA_FILE = /[\\/]minecraft-data[\\/]data[\\/].*\.json$/;
 
 /**
- * The versions worth bundling: the floor's major.minor and its patches.
- *
- * Deliberately wider than versions.yaml, which stops at the newest version that has had a
- * compatibility run. A patch release that appears after this build should still connect, and
- * bundling the whole 1.21 line costs little next to what is being dropped.
+ * The versions worth bundling: the floor and everything minecraft-data knows above it — not the
+ * floor's own line, which stopped meaning "everything newer" when 1.21.11 was followed by 26.1.
+ * Wider than versions.yaml on purpose, so a release newer than the last compatibility run still
+ * connects instead of being refused.
  */
 function supported(floor) {
-  const line = floor.split('.').slice(0, 2).join('.');
-  return new RegExp(`^${line.replace('.', '\\.')}(\\.\\d+)?$`);
+  const minimum = parse(floor);
+  return (version) => version != null && compare(parse(version), minimum) >= 0;
+}
+
+function parse(version) {
+  return String(version).split('-', 1)[0].split('.').map((part) => Number.parseInt(part, 10) || 0);
+}
+
+function compare(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const difference = (a[i] ?? 0) - (b[i] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }
 
 /** Every data file the supported versions reach, including the ones they borrow from elsewhere. */
 export function keptFiles(packageRoot, floor) {
-  return keptFilesForVersions(packageRoot, supported(floor), floor);
+  return keptFilesForVersions(packageRoot, supported(floor), `${floor} and later`);
 }
 
 /**
@@ -65,12 +76,7 @@ export function keptFiles(packageRoot, floor) {
  * the optional viewer asset use the same data.js-derived reference walk.
  */
 export function keptFilesForVersions(packageRoot, versions, description) {
-  const matcher = versions instanceof RegExp ? versions : null;
-  const wanted = matcher ? null : versions instanceof Set ? versions : new Set(versions);
-  const label = description ?? (matcher ? matcher.source : [...wanted].join(', '));
-  const matches = matcher
-    ? (version) => matcher.test(version ?? '')
-    : (version) => wanted.has(version);
+  const { matches, label } = selector(versions, description);
   const source = fs.readFileSync(path.join(packageRoot, 'data.js'), 'utf8');
 
   const keep = new Set();
@@ -105,6 +111,17 @@ export function keptFilesForVersions(packageRoot, versions, description) {
   return keep;
 }
 
+function selector(versions, description) {
+  if (typeof versions === 'function') {
+    return { matches: versions, label: description ?? 'the requested versions' };
+  }
+  if (versions instanceof RegExp) {
+    return { matches: (version) => versions.test(version ?? ''), label: description ?? versions.source };
+  }
+  const wanted = versions instanceof Set ? versions : new Set(versions);
+  return { matches: (version) => wanted.has(version), label: description ?? [...wanted].join(', ') };
+}
+
 /** An esbuild plugin that inlines the supported versions and refuses the rest. */
 export function slimMinecraftData(packageRoot, floor) {
   const keep = keptFiles(packageRoot, floor);
@@ -121,8 +138,8 @@ export function slimMinecraftData(packageRoot, floor) {
           loader: 'js',
           contents:
             `throw new Error("minecraft-data for ${name} is not in this runner: it is built for `
-            + `Minecraft ${floor} and its patch releases. Run the server on a supported version, `
-            + `or add it to versions.yaml and rebuild.");`,
+            + `Minecraft ${floor} and later. Run the server on a supported version, or update the `
+            + `runner's minecraft-data and rebuild.");`,
         };
       });
     },

@@ -40,4 +40,10 @@ versions:
   - id: "1.21.11"
     paper: { version: "1.21.11", build: 132 }
 
-# Not listed: versions beyond 1.21.11 need a compatibility run before they are added to the matrix.
+  # First calendar version after 1.21.11; protocol 775 covers 26.1 through 26.1.2. Paper needs
+  # Java 25 here, so the live tests start it with -Dvitaminmcp.serverJavaHome.
+  - id: "26.1.2"
+    paper: { version: "26.1.2", build: 74 }
+
+# Not listed: 26.2 and later need a compatibility run before they are added to the matrix.
+

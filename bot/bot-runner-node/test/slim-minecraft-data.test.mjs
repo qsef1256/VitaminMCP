@@ -4,8 +4,10 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import minecraftData from 'minecraft-data';
+
 import { keptFiles } from '../scripts/slim-minecraft-data.mjs';
-import { PING_VERSION } from '../src/version.mjs';
+import { PING_VERSION, versionForProtocol } from '../src/version.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageRoot = path.join(root, 'node_modules', 'minecraft-data');
@@ -29,7 +31,7 @@ test('the keep-set covers every file the supported versions ask for', () => {
   }
 });
 
-test('it keeps the older directories the 1.21 line borrows from', () => {
+test('it keeps the older directories the supported versions borrow from', () => {
   const directories = new Set(
     [...keptFiles(packageRoot, FLOOR)].map((file) => path.basename(path.dirname(file))),
   );
@@ -44,6 +46,52 @@ test('it keeps the older directories the 1.21 line borrows from', () => {
     );
   }
 });
+
+test('it keeps every version above the floor, not only the floor\'s own line', () => {
+  const directories = new Set(
+    [...keptFiles(packageRoot, FLOOR)].map((file) => path.basename(path.dirname(file))),
+  );
+
+  assert.ok(directories.has('26.1'), '26.1 is not bundled, so the prune stops at the 1.21 line');
+  for (const version of releasesAtOrAbove(FLOOR)) {
+    assert.ok(directories.has(version), `${version} ships in minecraft-data but is not bundled`);
+  }
+});
+
+test('the bundle covers every version in versions.yaml', () => {
+  const directories = new Set(
+    [...keptFiles(packageRoot, FLOOR)].map((file) => path.basename(path.dirname(file))),
+  );
+  const matrix = fs.readFileSync(path.join(root, '..', '..', 'versions.yaml'), 'utf8');
+  const versions = [...matrix.matchAll(/paper:\s*\{\s*version:\s*"([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(versions.length > 0, 'versions.yaml lists no Paper versions, so the parse is wrong');
+
+  for (const version of versions) {
+    const protocol = minecraftData.versionsByMinecraftVersion.pc[version]?.version;
+    assert.ok(protocol, `minecraft-data has never heard of ${version}, so the runner cannot join it`);
+    assert.ok(
+      directories.has(versionForProtocol(protocol)),
+      `${version} (protocol ${protocol}) is in versions.yaml but its data is not bundled`,
+    );
+  }
+});
+
+function releasesAtOrAbove(floor) {
+  const versions = minecraftData.versionsByMinecraftVersion.pc;
+  return fs.readdirSync(path.join(dataRoot, 'pc')).filter((name) => {
+    const known = versions[name];
+    return known?.releaseType === 'release' && atLeast(name, floor);
+  });
+}
+
+function atLeast(version, floor) {
+  const a = version.split('.').map(Number);
+  const b = floor.split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  }
+  return true;
+}
 
 test('it drops Bedrock and the versions below the floor', () => {
   const keep = keptFiles(packageRoot, FLOOR);
@@ -68,6 +116,6 @@ test('the version the ping is written with is one the build keeps', () => {
   assert.ok(kept, `the ping uses ${PING_VERSION}, which this build does not bundle`);
 });
 
-test('a floor minecraft-data has never heard of fails the build', () => {
-  assert.throws(() => keptFiles(packageRoot, '0.1'), /No minecraft-data entries matched/);
+test('a floor newer than anything minecraft-data ships fails the build', () => {
+  assert.throws(() => keptFiles(packageRoot, '99.1'), /No minecraft-data entries matched/);
 });

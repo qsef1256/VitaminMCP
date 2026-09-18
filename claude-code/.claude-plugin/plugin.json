@@ -1,7 +1,7 @@
 {
   "name": "vitaminmcp",
   "description": "Test Minecraft plugins end to end: drive a real Paper server and real protocol bots.",
-  "version": "3.0.1",
+  "version": "3.1.1",
   "author": {
     "name": "Backas03",
     "url": "https://github.com/Backas03"

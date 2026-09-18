@@ -40,7 +40,7 @@ class CompatibilityLiveTest {
     void everyFeatureWorksOnThisVersion() throws Exception {
         Path agentJar = required("vitaminmcp.agentJar");
         Path runnerJar = required("vitaminmcp.runnerJar");
-        Path javaHome = Path.of(System.getProperty("java.home"));
+        Path javaHome = ServerJava.home();
 
         Path work = Files.createTempDirectory("vitaminmcp-compat-" + VERSION + "-");
         String token = token();

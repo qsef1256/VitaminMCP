@@ -57,9 +57,14 @@ public final class VitaminMcpPlugin extends JavaPlugin {
         capture.start();
         logCaptureState(settings);
 
-        ObjectMapper mapper = new ObjectMapper();
+        // Nulls are omitted from serialized records — an absent field and a null field read the
+        // same to a client, and the nulls were costing lines in every query page. Fields whose
+        // null is meaningful are written as explicit tree nulls, which inclusion does not touch.
+        ObjectMapper mapper = new ObjectMapper()
+                .setSerializationInclusion(
+                        com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL);
         AgentTools tools = new AgentTools(
-                capture, mapper, ResponseBudget.DEFAULT, settings.readOnly());
+                capture, mapper, readBudget(config), settings.readOnly());
         mcpServer = new McpHttpServer(
                 settings, tools, mapper, getLogger(), getPluginMeta().getVersion());
 
@@ -114,6 +119,13 @@ public final class VitaminMcpPlugin extends JavaPlugin {
                     + settings.activityLog().name().toLowerCase(java.util.Locale.ROOT)
                     + "'; refused tokens and state-changing calls are still logged.");
         }
+    }
+
+    /** The response ceiling, from config.yml or the shipped default. */
+    private static ResponseBudget readBudget(FileConfiguration config) {
+        return new ResponseBudget(
+                config.getInt("max-response-items", ResponseBudget.DEFAULT.maxItems()),
+                config.getInt("max-response-bytes", ResponseBudget.DEFAULT.maxBytes()));
     }
 
     private AgentSettings readSettings(FileConfiguration config) {

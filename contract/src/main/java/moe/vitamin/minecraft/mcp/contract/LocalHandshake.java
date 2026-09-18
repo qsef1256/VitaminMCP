@@ -28,7 +28,7 @@ import java.util.stream.Stream;
  * {@code plugins/VitaminMCP/config.yml}, where the same token sits in the clear.
  *
  * <p>Java {@link Properties} rather than JSON, because {@code contract} takes no dependencies
- * (invariant 2) and a hand-rolled parser is a worse thing to own than a boring format.
+ * and a hand-rolled parser is a worse thing to own than a boring format.
  */
 public record LocalHandshake(
         String host,

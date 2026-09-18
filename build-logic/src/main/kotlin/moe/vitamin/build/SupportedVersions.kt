@@ -32,10 +32,12 @@ object SupportedVersions {
     /**
      * The JVM a given Minecraft version requires.
      *
-     * Mojang raised this four times, and each step is a hard boundary: a server on the older
-     * JVM cannot load bytecode built for the newer one.
+     * Mojang raised this five times, and each step is a hard boundary: a server on the older
+     * JVM cannot load bytecode built for the newer one. 26.1 is the calendar version after
+     * 1.21.11, and the numeric comparison below sorts it there.
      */
     fun requiredJavaRelease(minecraftVersion: String): Int = when {
+        isAtLeast(minecraftVersion, "26.1") -> 25
         isAtLeast(minecraftVersion, "1.20.5") -> 21
         isAtLeast(minecraftVersion, "1.18") -> 17
         isAtLeast(minecraftVersion, "1.17") -> 16

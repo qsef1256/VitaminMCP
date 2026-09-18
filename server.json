@@ -3,7 +3,7 @@
   "name": "io.github.Backas03/vitaminmcp",
   "title": "VitaminMCP",
   "description": "Test Minecraft plugins end to end: drive a real Paper server and real protocol bots.",
-  "version": "3.0.1",
+  "version": "3.1.1",
   "websiteUrl": "https://github.com/Backas03/VitaminMCP#readme",
   "repository": {
     "url": "https://github.com/Backas03/VitaminMCP",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "vitaminmcp",
-      "version": "3.0.1",
+      "version": "3.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

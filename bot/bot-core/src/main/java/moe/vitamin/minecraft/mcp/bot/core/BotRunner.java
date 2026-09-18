@@ -41,10 +41,15 @@ public final class BotRunner implements AutoCloseable {
     /** Launches the runner and waits until it is ready. */
     public static BotRunner launch(Path runnerPath, String host, int port)
             throws IOException {
+        return launch(runnerPath, host, port, null);
+    }
+
+    /** Launches the runner with an optional Minecraft protocol override. */
+    public static BotRunner launch(Path runnerPath, String host, int port, Integer protocol)
+            throws IOException {
         Objects.requireNonNull(runnerPath, "runnerPath");
 
-        Process process = new ProcessBuilder(commandFor(runnerPath, host, port))
-
+        Process process = new ProcessBuilder(commandFor(runnerPath, host, port, protocol))
                 .redirectError(ProcessBuilder.Redirect.INHERIT)
                 .start();
 
@@ -74,8 +79,14 @@ public final class BotRunner implements AutoCloseable {
      * the same way and answer the same protocol, so which one is in use is a path and nothing
      * more — which is what lets the two be run against the same server on the same afternoon.
      */
-    static List<String> commandFor(Path runner, String host, int port) {
+    static List<String> commandFor(Path runner, String host, int port) throws IOException {
+        return commandFor(runner, host, port, null);
+    }
+
+    static List<String> commandFor(Path runner, String host, int port, Integer protocol) throws IOException {
         String path = runner.toAbsolutePath().toString();
+        rejectJarRunner(runner, path);
+
         List<String> command = new ArrayList<>();
 
         if (isScript(runner)) {
@@ -87,6 +98,9 @@ public final class BotRunner implements AutoCloseable {
 
         command.add(host);
         command.add(String.valueOf(port));
+        if (protocol != null) {
+            command.add(String.valueOf(protocol));
+        }
         return command;
     }
 
@@ -145,6 +159,24 @@ public final class BotRunner implements AutoCloseable {
                 reply.length > 14 ? List.of(RunnerProtocol.records(reply[14])) : List.of());
     }
 
+    /**
+     * Refuses a jar path before the operating system does it less helpfully.
+     *
+     * <p>The option is still called {@code runnerJar}, and older notes, docs and shell history
+     * still name {@code bot-runner.jar}, so a path left over from those gets passed in long after
+     * the jar runner stopped existing. Handed to {@code ProcessBuilder} it comes back as
+     * {@code CreateProcess error=193}, which says nothing about runners at all.
+     */
+    private static void rejectJarRunner(Path runner, String path) throws IOException {
+        if (!runner.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".jar")) {
+            return;
+        }
+        throw new IOException(path + " is a jar, but this version's bot runner is not one. Bots "
+                + "run on a native runner (bot-runner-win-x64.exe and its per-platform siblings) "
+                + "or on runner.mjs through Node. The setting kept the name 'runnerJar'; the file "
+                + "it names has to be one of those.");
+    }
+
     private static boolean isScript(Path runner) {
         String name = runner.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
         return name.endsWith(".mjs") || name.endsWith(".js");
@@ -157,7 +189,7 @@ public final class BotRunner implements AutoCloseable {
      * machine with several runtimes usually means one of them was chosen deliberately, and PATH is
      * the one nobody remembers setting.
      */
-    private static String node() {
+    static String node() {
         String configured = System.getenv("VITAMINMCP_NODE");
         if (configured != null && !configured.isBlank()) {
             return configured;
@@ -231,8 +263,12 @@ public final class BotRunner implements AutoCloseable {
 
         String line = readWithTimeout();
         String[] reply = RunnerProtocol.decode(line);
-        if (reply.length > 0 && RunnerProtocol.ERROR.equals(reply[0])) {
-
+        if (reply.length < 2 || !command[0].equals(reply[1])) {
+            // Not a reply but something else written to stdout; taking it as one desynchronises everything after.
+            throw new IOException("The bot runner answered '" + command[0] + "' with a line that "
+                    + "is not a reply to it: " + line);
+        }
+        if (RunnerProtocol.ERROR.equals(reply[0])) {
             throw new IOException(reply.length > 2 ? reply[2] : "the runner reported an error");
         }
         return reply;

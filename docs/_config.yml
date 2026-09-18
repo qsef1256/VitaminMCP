@@ -1,0 +1,9 @@
+title: VitaminMCP
+description: >-
+  Minecraft MCP server plugin for AI agents — end-to-end testing of Paper/Purpur
+  plugins with real protocol bots, live server state, logs, events and GUIs.
+theme: jekyll-theme-primer
+plugins:
+  - jekyll-seo-tag
+  - jekyll-relative-links
+  - jekyll-sitemap

@@ -534,9 +534,10 @@ public final class McpHttpServer {
         return result;
     }
 
+    /** Compact on purpose: the reader is a model, and pretty-printing only costs its context. */
     private String writeText(JsonNode payload) {
         try {
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
+            return mapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
             return payload.toString();
         }

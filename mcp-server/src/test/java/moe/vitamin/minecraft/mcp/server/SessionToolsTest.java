@@ -1,6 +1,7 @@
 package moe.vitamin.minecraft.mcp.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import java.util.stream.Stream;
 import moe.vitamin.minecraft.mcp.bot.spi.ClientMessage;
 import moe.vitamin.minecraft.mcp.bot.spi.ClientView;
 import org.junit.jupiter.api.Test;
@@ -47,12 +49,53 @@ class SessionToolsTest {
     }
 
     @Test
+    void aRunnerIsFoundUnderEveryNameAReleasePublishes() {
+        assertTrue(SessionTools.isRunnerFile("runner.mjs"));
+        assertTrue(SessionTools.isRunnerFile("runner.js"));
+        assertTrue(SessionTools.isRunnerFile("bot-runner-win-x64.exe"));
+        assertTrue(SessionTools.isRunnerFile("bot-runner-linux-x64"));
+        assertTrue(SessionTools.isRunnerFile("bot-runner-linux-arm64"));
+        assertTrue(SessionTools.isRunnerFile("bot-runner-darwin-x64"));
+        assertTrue(SessionTools.isRunnerFile("bot-runner-darwin-arm64"));
+        assertTrue(SessionTools.isRunnerFile("BOT-RUNNER-DARWIN-ARM64"));
+    }
+
+    @Test
+    void onlyRunnersCountTowardsTheRefusalToGuessBetweenSeveral() {
+        assertFalse(SessionTools.isRunnerFile("mcp-server.jar"));
+        assertFalse(SessionTools.isRunnerFile("bot-runner-viewer-win-x64.tgz"));
+        assertFalse(SessionTools.isRunnerFile("bot-runner-linux-x64.part"));
+
+        assertEquals(1L, runnersAmong(
+                "mcp-server.jar", "bot-runner-linux-x64", "server.properties"));
+        assertEquals(2L, runnersAmong("mcp-server.jar", "bot-runner-linux-x64", "runner.mjs"));
+    }
+
+    @Test
+    void sessionStartPublishesTheMinecraftProtocolOverride() {
+        JsonNode start = findTool(new SessionTools().listTools(), "session_start");
+        JsonNode protocol = start.path("inputSchema").path("properties")
+                .path("minecraftProtocol");
+
+        assertEquals("integer", protocol.path("type").asText());
+        assertTrue(protocol.path("description").asText().contains("proxy"));
+
+        ObjectNode arguments = MAPPER.createObjectNode().put("minecraftProtocol", 772);
+        assertEquals(772, SessionTools.minecraftProtocol(arguments));
+        arguments.put("minecraftProtocol", 0);
+        assertThrows(IllegalArgumentException.class,
+                () -> SessionTools.minecraftProtocol(arguments));
+    }
+
+    @Test
     void botSpawnPublishesMicrosoftAuthenticationWithoutMakingItTheDefault() {
         JsonNode spawn = findTool(new SessionTools().listTools(), "bot_spawn");
 
         JsonNode properties = spawn.path("inputSchema").path("properties");
         assertTrue(properties.path("auth").path("description").asText()
                 .contains("online-mode=true"));
+        assertEquals(MAPPER.createArrayNode().add("offline").add("microsoft"),
+                properties.path("auth").path("enum"));
         assertTrue(properties.path("account").path("description").asText()
                 .contains("cache key"));
         assertTrue(spawn.path("description").asText().contains("read-only"));
@@ -141,6 +184,10 @@ class SessionToolsTest {
                         MAPPER.createObjectNode(), view, "Tester1", 14L));
         assertTrue(future.getMessage().contains("ahead"));
         assertTrue(future.getMessage().contains("Tester1"));
+    }
+
+    private static long runnersAmong(String... names) {
+        return Stream.of(names).filter(SessionTools::isRunnerFile).count();
     }
 
     private static ClientView view(long nextSequence, List<ClientMessage> messages) {

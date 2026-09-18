@@ -11,6 +11,10 @@ final class Session {
     private final int port;
     private final AgentClient agent;
     private final java.nio.file.Path runnerJar;
+    private final Integer minecraftProtocol;
+
+    /** Defaults closed until session_start has read the agent's declared mode. */
+    private boolean readOnly = true;
 
     /** Defaults closed until session_start has read the agent's declared mode. */
     private boolean readOnly = true;
@@ -21,11 +25,18 @@ final class Session {
     Session(String host, int port, int mcpPort, String token, boolean tls, String tlsFingerprint,
             java.nio.file.Path runnerJar)
             throws java.io.IOException {
+        this(host, port, mcpPort, token, tls, tlsFingerprint, runnerJar, null);
+    }
+
+    Session(String host, int port, int mcpPort, String token, boolean tls, String tlsFingerprint,
+            java.nio.file.Path runnerJar, Integer minecraftProtocol)
+            throws java.io.IOException {
         this.host = host;
         this.port = port;
         this.agent = new AgentClient(host, mcpPort, token, tls, tlsFingerprint);
         this.runnerJar = runnerJar;
-        this.bots = BotRunner.launch(runnerJar, host, port);
+        this.minecraftProtocol = minecraftProtocol;
+        this.bots = BotRunner.launch(runnerJar, host, port, minecraftProtocol);
     }
 
     AgentClient agent() {
@@ -60,7 +71,7 @@ final class Session {
     /** Disconnects every bot but keeps the session. */
     void reset() throws java.io.IOException {
         bots.close();
-        bots = BotRunner.launch(runnerJar, host, port);
+        bots = BotRunner.launch(runnerJar, host, port, minecraftProtocol);
     }
 
     void close() {
