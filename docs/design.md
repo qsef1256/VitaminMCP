@@ -691,6 +691,18 @@ surface as a hash failure indistinguishable from a compromised download.
 available, no runner asset is downloaded; the Windows native asset is fetched only when Node is
 not available and a bot session needs it.
 
+The default transport is stdio because every MCP client supports it. `--http` is the local shared
+alternative for clients that eagerly launch one stdio process per loaded project. It binds only to
+loopback and gives each connection a separate `SessionTools` owner through `Mcp-Session-Id`; only
+the JVM and server code are shared. The HTTP process is owned by a service manager; the stdio path
+remains unchanged.
+
+On Windows the durable owner is an opt-in service, installed with `vitaminmcp service install`.
+The installer copies the invoking npm package to a stable ProgramData path, verifies a pinned WinSW
+binary, and runs under the passwordless service-specific `NT SERVICE\VitaminMCP` identity. That
+identity receives access only to its installed runtime, logs and the user's `.vitaminmcp` cache.
+The client then needs only the loopback URL: no per-session hook owns or duplicates the JVM.
+
 The handoff is a file rename. Partial downloads use `.part`; `mcp-server` waits for the rename
 rather than polling for a size, so it can never open a half-written asset.
 

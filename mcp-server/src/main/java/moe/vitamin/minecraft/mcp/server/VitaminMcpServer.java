@@ -30,32 +30,63 @@ public final class VitaminMcpServer {
     private final SetupPrompts prompts = new SetupPrompts(VERSION);
 
     public static void main(String[] args) throws IOException {
-        new VitaminMcpServer().run();
+        if (args.length == 0)
+            new VitaminMcpServer().run();
+        else
+            runHttp(args);
+    }
+
+    private static void runHttp(String[] args) throws IOException {
+        int port = parsePort(args);
+        try (VitaminMcpHttpServer server = new VitaminMcpHttpServer(port)) {
+            Runtime.getRuntime().addShutdownHook(new Thread(server::close, "VitaminMCP-http-shutdown"));
+            server.start();
+            server.await();
+        }
+    }
+
+    private static int parsePort(String[] args) {
+        if (args.length > 2 || !"--http".equals(args[0])) {
+            throw new IllegalArgumentException("Usage: java -jar mcp-server.jar [--http [port]]");
+        }
+        if (args.length == 1) {
+            return VitaminMcpHttpServer.DEFAULT_PORT;
+        }
+        try {
+            int port = Integer.parseInt(args[1]);
+            if (port < 0 || port > 65535) {
+                throw new NumberFormatException();
+            }
+            return port;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("HTTP port must be between 0 and 65535: " + args[1]);
+        }
     }
 
     private void run() throws IOException {
-
         PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8);
         BufferedReader in = new BufferedReader(
                 new InputStreamReader(System.in, StandardCharsets.UTF_8));
 
         System.err.println("VitaminMCP server ready on stdio");
 
-        String line;
-        while ((line = in.readLine()) != null) {
-            if (line.isBlank()) {
-                continue;
+        try {
+            String line;
+            while ((line = in.readLine()) != null) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                ObjectNode response = handle(line);
+                if (response != null) {
+                    out.println(response);
+                }
             }
-            ObjectNode response = handle(line);
-            if (response != null) {
-                out.println(response);
-            }
+        } finally {
+            close();
         }
-
-        tools.close();
     }
 
-    private ObjectNode handle(String line) {
+    ObjectNode handle(String line) {
         JsonNode request;
         try {
             request = MAPPER.readTree(line);
@@ -63,6 +94,10 @@ public final class VitaminMcpServer {
             return error(null, -32700, "Malformed JSON");
         }
 
+        return handle(request);
+    }
+
+    synchronized ObjectNode handle(JsonNode request) {
         JsonNode id = request.has("id") ? request.get("id") : null;
         String method = request.path("method").asText("");
         JsonNode params = request.has("params") ? request.get("params") : MAPPER.createObjectNode();
@@ -94,6 +129,10 @@ public final class VitaminMcpServer {
             System.err.println("Error handling " + method + ": " + e);
             return error(id, -32603, String.valueOf(e.getMessage()));
         }
+    }
+
+    void close() {
+        tools.close();
     }
 
     private ObjectNode initialize(JsonNode params) {
@@ -172,4 +211,5 @@ public final class VitaminMcpServer {
         error.put("message", message);
         return response;
     }
+
 }

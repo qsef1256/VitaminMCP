@@ -36,6 +36,23 @@ as — `/mcp` lists it); in any client, just ask:
 Once the plugin is running, `session_start` needs no arguments for a server on this machine: the
 agent leaves its host, ports and token where this server reads them.
 
+## One process for many projects
+
+If a Windows client keeps one stdio server per loaded project, install one shared service:
+
+```powershell
+npx -y vitaminmcp service install
+```
+
+Configure those projects with the URL `http://127.0.0.1:25584/mcp`. Each client gets isolated MCP
+state, and bot runners are still created only after `session_start`. Windows asks for administrator
+approval once; no client startup hook or Windows account password is needed. `service status` and
+`service uninstall` inspect or remove it, and installing again updates it. Account data is kept on
+uninstall.
+
+Elsewhere, a platform service manager can own `npx -y vitaminmcp --http 25584` as a foreground
+process. The portable default remains stdio.
+
 ## What you get
 
 - Spawn and control test players — real protocol clients, not mock `Player` objects

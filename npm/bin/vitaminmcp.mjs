@@ -9,8 +9,9 @@ import { fileURLToPath } from 'node:url';
 import {
   MCP_SERVER_JAR, assetPath, ensureAsset, ensureJar,
 } from '../lib/jars.mjs';
-import { checkJava, findJava } from '../lib/java.mjs';
+import { checkJava, findJava, mcpServerArgs } from '../lib/java.mjs';
 import { checkNode, findNode, runnerAssetName, viewerAssetName } from '../lib/node.mjs';
+import { runServiceAction, serviceAction } from '../lib/service.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +46,9 @@ Options
   --help        this text
   --version     the version this launcher will run
   --jars        download the jars and print where they are, without starting anything
+  --http [port] serve MCP over loopback HTTP (default port 25584)
+  service install|uninstall|status
+                manage one shared Windows service (install also updates it)
 
 Environment
   JAVA_HOME               the JDK to run the jars with; Java 21 or later
@@ -67,6 +71,17 @@ async function main() {
   if (argv.includes('--version') || argv.includes('-v')) {
     process.stderr.write(`${release}\n`);
     return 0;
+  }
+
+  const service = serviceAction(argv);
+  if (service) {
+    if (service === 'install') {
+      const java = findJava();
+      const usable = checkJava(java);
+      if (!usable.ok) die(usable.message);
+      return await runServiceAction(service, release, { java });
+    }
+    return await runServiceAction(service, release);
   }
 
   const java = findJava();
@@ -121,17 +136,11 @@ async function main() {
   }
 
   await runnerReady;
-  return await run(java, server, runner, release, viewerAsset);
+  const env = serverEnvironment(runner, release, viewerAsset);
+  return await run(java, server, env, argv);
 }
 
-/**
- * Runs the server jar, and lives exactly as long as it does.
- *
- * A download still in flight is abandoned when the server exits rather than held on to: the
- * `.part` file it leaves is claimed again by the next start, and a client waiting on a process
- * that no longer serves anything is worse than a jar fetched twice.
- */
-function run(java, server, runner, release, viewerAsset) {
+function serverEnvironment(runner, release, viewerAsset) {
   const env = {
     ...process.env,
     VITAMINMCP_RUNNER_JAR: runner,
@@ -142,7 +151,12 @@ function run(java, server, runner, release, viewerAsset) {
   if (!env.VITAMINMCP_VIEWER_PATH) {
     env.VITAMINMCP_VIEWER_PATH = path.join(HERE, '..', 'lib', 'viewer-loader.mjs');
   }
-  const child = spawn(java, ['-jar', server], {
+  return env;
+}
+
+/** Runs the server jar, and lives exactly as long as it does. */
+function run(java, server, env, args) {
+  const child = spawn(java, mcpServerArgs(server, args), {
     stdio: 'inherit',
     env,
   });

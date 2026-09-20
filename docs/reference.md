@@ -18,7 +18,7 @@ Three jars, in three different places. Only the first is a Minecraft plugin.
 ```text
   your MCP client (Claude Code, Cursor, Codex, Gemini CLI, ...)
         |
-        |  stdio
+        |  stdio, or shared loopback HTTP
         v
   mcp-server.jar ---- HTTP(S) + token ---->  VitaminMCP.jar  <- the plugin, inside your server
         |                                    sees events, logs, exceptions, live state
@@ -31,7 +31,7 @@ Three jars, in three different places. Only the first is a Minecraft plugin.
 | | Runs | Role |
 |---|---|---|
 | `VitaminMCP.jar` | **in the server, as a plugin** | Listens to every event, taps the log, and serves an authenticated MCP endpoint. The only piece with a view of server internals |
-| `mcp-server.jar` | on your machine, as a child of your MCP client | Speaks stdio to the client and HTTP to the plugin, and owns the bots |
+| `mcp-server.jar` | on your machine | Speaks stdio or shared loopback HTTP to clients, HTTP to the plugin, and owns the bots |
 | `runner.mjs` or a platform `bot-runner-*` asset | on your machine, as a child of `mcp-server` | Connects real clients over the real protocol — login, packets, GUIs and all |
 
 The plugin sees server-side events, logs, permissions and state; the Node runner sees what a real
@@ -271,6 +271,11 @@ other plugins:
 
 Their license and notice files travel inside the jars under `META-INF/` — relocating a package
 renames it, it does not lift the obligation to carry the notice.
+
+The optional Windows service installer downloads
+[WinSW 2.12.0](https://github.com/winsw/winsw/releases/tag/v2.12.0) from its official release and
+accepts only the SHA-256 pinned in the installer. WinSW is MIT licensed and is not bundled in this
+repository or the npm package.
 
 `paper-api`, `log4j-core` and the JetBrains annotations are compile-only and are not distributed.
 The agent compiles against Paper's API, which is LGPL-3.0; the jar does not contain it, and the

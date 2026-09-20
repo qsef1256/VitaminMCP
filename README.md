@@ -135,6 +135,10 @@ claude mcp add vitaminmcp -- npx -y vitaminmcp
 It is also on the [official MCP registry](https://registry.modelcontextprotocol.io) as
 `io.github.Backas03/vitaminmcp`, so clients with a registry catalogue can add it from there.
 
+Clients that keep one stdio process per loaded project can instead connect all projects to
+[one shared loopback server](INSTALL.md#one-shared-process-for-many-client-sessions). On Windows,
+`npx -y vitaminmcp service install` installs and verifies that shared server in one command.
+
 **3. Let the agent wire itself up** — ask it to run the `setup` prompt (in Claude Code:
 `/mcp__vitaminmcp__setup`). It finds the running server, checks the plugin, and connects.
 

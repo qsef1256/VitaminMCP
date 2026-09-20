@@ -60,12 +60,54 @@ when it was published.
 directly and no runner asset is downloaded. Without Node, the launcher selects the native runner
 asset for the current platform, and every supported platform has one.
 
-`mcp-server` speaks stdio. It has no port and no token: it is a child process of the client, so the
-trust relationship already exists. Only the agent side crosses a network, which is why only the
-agent side authenticates.
+By default, `mcp-server` speaks stdio. It has no port and no token: it is a child process of the
+client, so the trust relationship already exists. Only the agent side crosses a network, which is
+why only the agent side authenticates. For clients that keep many projects loaded, the shared mode
+below keeps one local MCP process instead.
 
 > Needs **Node 18.17+** for `npx`, and **Java 21** to run the jars. No npm, or nothing to download
 > with? [Install from the jars](#installing-from-the-jars-instead).
+
+### One shared process for many client sessions
+
+Some clients launch every configured stdio server once per loaded project. On Windows, install one
+shared service instead. The command downloads a checksum-pinned WinSW wrapper, installs this exact
+npm package under `C:\ProgramData\VitaminMCP`, grants its service-specific Windows identity access
+to `~/.vitaminmcp`, and verifies the MCP endpoint before it returns:
+
+```powershell
+npx -y vitaminmcp service install
+```
+
+Windows asks for administrator approval once. It does not ask for or store your account password.
+Re-running the command updates the installed package. Inspect or remove it with `service status`
+or `service uninstall`; uninstalling keeps Microsoft account and agent handshake data under
+`~/.vitaminmcp`.
+
+Then point each client at the shared endpoint instead of giving it a command. For Codex:
+
+```toml
+[mcp_servers.vitaminmcp]
+url = "http://127.0.0.1:25584/mcp"
+startup_timeout_sec = 60
+```
+
+No Codex hook or per-project launcher is needed. Restart the client once after replacing its stdio
+entry with the URL.
+
+On systems without Windows services, have the platform's service manager or another supervisor own
+the same foreground process:
+
+```bash
+npx -y vitaminmcp --http 25584
+```
+
+The shared server binds only to `127.0.0.1`. Each MCP client receives an isolated session, so its
+Minecraft connections and bots cannot be addressed by another client. Bot runners still start
+only after `session_start`; merely loading another project adds no JVM or runner process.
+
+This mode is opt-in. The stdio configuration above remains the portable default for clients that
+already manage child-process lifetimes correctly.
 
 ## 2. Install the plugin on the server
 

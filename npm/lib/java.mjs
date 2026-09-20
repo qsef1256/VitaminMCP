@@ -5,6 +5,11 @@ import path from 'node:path';
 /** The floor the jars are compiled against. Below it they will not load at all. */
 export const REQUIRED_JAVA = 21;
 
+/** Keeps every launcher-started JVM small, including the optional shared HTTP server. */
+export function mcpServerArgs(server, args = []) {
+  return ['-Xms16m', '-Xmx128m', '-XX:+UseSerialGC', '-jar', server, ...args];
+}
+
 /**
  * The java to run the jars with: JAVA_HOME if it points at one, otherwise whatever is on PATH.
  *
